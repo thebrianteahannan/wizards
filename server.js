@@ -2,6 +2,7 @@ const path = require("path");
 const express = require("express");
 const { init, readJson, writeJson, status } = require("./store");
 const { attachAuth, requireTeam, requireAdmin, resolvePlayer } = require("./accounts");
+const { attachRecruitActions } = require("./recruit-actions");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -378,6 +379,13 @@ app.put("/api/recruits/:id", requireTeam, async (req, res) => {
   };
   await writeJson("recruits.json", data);
   res.json(data);
+});
+
+attachRecruitActions(app, {
+  readJson,
+  writeJson,
+  requireAdmin,
+  positions: JOIN_POS,
 });
 
 const FEE_MODELS = ["flat", "split", "core", "play"];

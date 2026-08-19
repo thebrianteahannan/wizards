@@ -86,6 +86,18 @@ function renderJoin() {
   `;
 }
 
+function recruitActions(r) {
+  if (r.contactedAt && !isAdmin()) return `<p class="muted">Contacted</p>`;
+  if (!isAdmin()) return "";
+  return `<div class="actions" style="margin-top:0.55rem">
+      ${r.contactedAt
+        ? `<span class="muted">Contacted</span>
+           <button class="btn" type="button" data-recruit-roster="${attr(r.id)}">They want on the team</button>`
+        : `<button class="btn" type="button" data-recruit-contact="${attr(r.id)}">I've contacted them</button>`}
+    </div>
+    <p class="muted recruit-action-msg"></p>`;
+}
+
 function renderRecruits(data, openId) {
   const rows = (data.recruits || [])
     .map((r) => {
@@ -112,6 +124,7 @@ function renderRecruits(data, openId) {
             </div>
             <p class="muted recruit-msg"></p>
           </form>` : ""}
+          ${recruitActions(r)}
         </div>
       </article>`;
     })
@@ -119,7 +132,7 @@ function renderRecruits(data, openId) {
   return `
     <p class="kicker">Team only</p>
     <h1>Recruits</h1>
-    <p class="lede">People who joined or that a Wizard recruited. Add phone, email, or notes whenever you get them. ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}</p>
+    <p class="lede">People who joined or that a Wizard recruited. Add phone, email, or notes whenever you get them. ${isAdmin() ? "After you contact someone, you can move them onto the roster." : ""} ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}</p>
     <div class="timeline" style="margin-top:1rem">${rows || '<p class="muted">The inbox is empty.</p>'}</div>
   `;
 }
@@ -164,5 +177,30 @@ function bindRecruits(data) {
         if (msg) msg.textContent = err.message;
       }
     });
+  });
+  async function runRecruitAction(btn, path, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    btn.disabled = true;
+    const card = btn.closest("article");
+    const msg = card && card.querySelector(".recruit-action-msg");
+    try {
+      const next = await api.send(path, "POST", {});
+      document.getElementById("app").innerHTML = renderRecruits(next);
+      bindRecruits(next);
+    } catch (err) {
+      btn.disabled = false;
+      if (msg) msg.textContent = err.message;
+      else window.alert(err.message);
+    }
+  }
+  document.querySelectorAll("[data-recruit-contact]").forEach((btn) => {
+    btn.addEventListener("click", () => runRecruitAction(btn, "/api/recruits/" + btn.dataset.recruitContact + "/contact"));
+  });
+  document.querySelectorAll("[data-recruit-roster]").forEach((btn) => {
+    const card = btn.closest("article");
+    const name = card && card.querySelector("h3") ? card.querySelector("h3").textContent.trim() : "This recruit";
+    btn.addEventListener("click", () =>
+      runRecruitAction(btn, "/api/recruits/" + btn.dataset.recruitRoster + "/roster", name + " will move to the roster. Continue?")
+    );
   });
 }
