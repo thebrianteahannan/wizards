@@ -43,10 +43,12 @@ function attachRecruitActions(app, { readJson, writeJson, requireAdmin, position
       regular: true,
       squads: ["league"],
     });
-    if (r.phone) {
+    if (r.phone || r.email) {
       const contacts = await readJson("contacts.json");
       contacts.phones = contacts.phones || {};
-      contacts.phones[id] = r.phone;
+      contacts.emails = contacts.emails || {};
+      if (r.phone) contacts.phones[id] = r.phone;
+      if (r.email) contacts.emails[id] = r.email;
       await writeJson("contacts.json", contacts);
     }
     data.recruits.splice(i, 1);

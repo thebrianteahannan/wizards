@@ -74,8 +74,8 @@
     {
       "id": "jostheir-aponte",
       "name": "Jostheir Aponte",
-      "number": null,
-      "positions": [],
+      "number": 0,
+      "positions": ["Util"],
       "born": null,
       "sex": "M",
       "status": "Active",

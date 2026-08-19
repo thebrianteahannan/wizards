@@ -310,7 +310,7 @@ app.get("/api/contacts", requireTeam, async (_req, res) => {
   res.json(await readJson("contacts.json"));
 });
 
-const JOIN_POS = ["P", "C", "2B", "SS", "LF", "CF", "RF", "Util"];
+const JOIN_POS = ["P", "2B", "SS", "LF", "CF", "RF", "Util"];
 
 function parseRecruit(body, requirePhone) {
   const firstName = String((body && body.firstName) || "").trim().slice(0, 40);
