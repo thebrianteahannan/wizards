@@ -1,0 +1,74 @@
+{
+  "needed": 6,
+  "windows": [
+    {
+      "id": "afternoon",
+      "label": "Afternoon",
+      "hint": "12–5"
+    },
+    {
+      "id": "evening",
+      "label": "Evening",
+      "hint": "5–9"
+    },
+    {
+      "id": "night",
+      "label": "Night",
+      "hint": "9–11"
+    }
+  ],
+  "days": [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday"
+  ],
+  "players": {
+    "brian-hannan": {
+      "name": "Brian Hannan",
+      "updatedAt": "2026-08-18T22:47:33.021Z",
+      "days": {
+        "monday": {
+          "status": "no",
+          "windows": []
+        },
+        "tuesday": {
+          "status": "no",
+          "windows": []
+        },
+        "wednesday": {
+          "status": "maybe",
+          "windows": [
+            "afternoon",
+            "evening",
+            "night"
+          ]
+        },
+        "thursday": {
+          "status": "yes",
+          "windows": [
+            "afternoon",
+            "evening",
+            "night"
+          ]
+        },
+        "friday": {
+          "status": "no",
+          "windows": []
+        },
+        "saturday": {
+          "status": "no",
+          "windows": []
+        },
+        "sunday": {
+          "status": "no",
+          "windows": []
+        }
+      }
+    }
+  },
+  "lockedNight": null
+}

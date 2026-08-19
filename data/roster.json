@@ -1,0 +1,135 @@
+{
+  "team": "The Wizards of Wiff",
+  "shortName": "Wizards",
+  "league": "Florida Challengers League",
+  "season": "Fall 2026",
+  "location": "Brooksville, FL",
+  "homeArea": "Bradenton / Tampa Bay",
+  "fee": "$250 per team for the year",
+  "coManagers": [
+    { "id": "tony-kurtanick", "name": "Tony Kurtanick" },
+    { "id": "brian-hannan", "name": "Brian Hannan" }
+  ],
+  "players": [
+    {
+      "id": "tony-kurtanick",
+      "name": "Tony Kurtanick",
+      "number": 8,
+      "positions": ["P"],
+      "born": "7/10/1973",
+      "sex": "M",
+      "status": "Active",
+      "role": "Co-manager",
+      "regular": true,
+      "squads": ["league", "tournament"]
+    },
+    {
+      "id": "brian-hannan",
+      "name": "Brian Hannan",
+      "number": 23,
+      "positions": ["P", "LF"],
+      "born": "6/23/1984",
+      "sex": "M",
+      "status": "Active",
+      "role": "Co-manager",
+      "regular": true,
+      "squads": ["league", "tournament"]
+    },
+    {
+      "id": "jose-gonzalez",
+      "name": "Jose Gonzalez",
+      "number": 2,
+      "positions": ["2B", "SS"],
+      "born": "3/4/1972",
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league", "tournament"]
+    },
+    {
+      "id": "jr-cadotte",
+      "name": "Jr Cadotte",
+      "number": null,
+      "positions": ["P"],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league"]
+    },
+    {
+      "id": "angel-rodriguez",
+      "name": "Angel Rodriquez",
+      "number": null,
+      "positions": ["2B", "CF"],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league"]
+    },
+    {
+      "id": "jostheir-aponte",
+      "name": "Jostheir Aponte",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league"]
+    },
+    {
+      "id": "damian-gilpin",
+      "name": "Damian Gilpin",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league"]
+    },
+    {
+      "id": "ben-zysek",
+      "name": "Ben Zysek",
+      "number": 56,
+      "positions": ["2B", "RF"],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["tournament"]
+    },
+    {
+      "id": "cam",
+      "name": "Cam Dupe",
+      "number": null,
+      "positions": ["P", "CF"],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["tournament"]
+    },
+    {
+      "id": "jakob-lafirst",
+      "name": "Jakob Lafirst",
+      "number": 17,
+      "positions": ["2B", "P"],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["tournament"]
+    }
+  ]
+}

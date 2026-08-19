@@ -1,0 +1,15 @@
+{
+  "model": "flat",
+  "teamTotal": 250,
+  "flatAmount": 25,
+  "dueDate": "2026-09-15",
+  "payTo": "Brian Hannan",
+  "method": "Venmo or cash — pay Brian Hannan",
+  "corePlayerIds": [],
+  "benchAmount": 0,
+  "expectedNights": 10,
+  "perNight": null,
+  "note": "This covers the $250 PLW team fee only. Jerseys, shoes, gas, and tournament entries are separate.",
+  "updatedBy": "Tony Kurtanick",
+  "updatedAt": "2026-08-18T22:35:33.048Z"
+}

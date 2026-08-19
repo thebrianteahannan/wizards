@@ -1,0 +1,19 @@
+{
+  "name": "wizards-of-wiff",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Team hub for The Wizards of Wiff - Florida Challengers League",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "deploy": "bash scripts/deploy-hostinger.sh",
+    "deploy:fresh": "bash scripts/deploy-hostinger.sh --with-data"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

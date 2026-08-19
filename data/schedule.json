@@ -1,0 +1,99 @@
+{
+  "leagueNight": {
+    "needed": 6,
+    "note": "Florida Challengers League weeknights. Need 6 players at the same time. Flexible scheduling until lights are fully available."
+  },
+  "events": [
+    {
+      "id": "aug1-tourney",
+      "date": "2026-08-01",
+      "title": "PLW Tournament — Brooksville",
+      "when": "Gates 9:00 AM · First pitch 10:00 AM",
+      "kind": "tournament",
+      "status": "played",
+      "detail": "Pool C vs Savages (10 AM, Grass 2), Sandvipers (1 PM, Grass 1), Cloud Seeders (3 PM, Turf). Entry $200. 21+."
+    },
+    {
+      "id": "opening-night",
+      "date": "2026-08-06",
+      "title": "Florida Fall League Opening Night",
+      "when": "7:00 PM EST · Live on Twitch",
+      "kind": "league",
+      "status": "played",
+      "detail": "Season kickoff streamed on twitch.tv/premierwiffle.",
+      "link": "https://www.twitch.tv/videos/2834716125"
+    },
+    {
+      "id": "tryouts",
+      "date": "2026-08-16",
+      "title": "Tryouts / Free Agent Day",
+      "when": "Brooksville, FL",
+      "kind": "league",
+      "status": "played",
+      "detail": "PLW free agent / tryout day for the Florida Challengers League."
+    },
+    {
+      "id": "eos-showdown",
+      "date": "2026-08-29",
+      "title": "End of Summer Showdown",
+      "when": "10:00 AM · Brooksville",
+      "kind": "tournament",
+      "status": "upcoming",
+      "detail": "Team entry $250. Three-game guarantee. Champion $1,500. Best-dressed awards. 21+."
+    },
+    {
+      "id": "sep-tourney",
+      "date": "2026-09-26",
+      "title": "PLW Tournament",
+      "when": "Brooksville, FL",
+      "kind": "tournament",
+      "status": "upcoming",
+      "detail": "Next monthly tournament on the PLW 2026 calendar."
+    },
+    {
+      "id": "florida-faceoff",
+      "date": "2026-10-17",
+      "title": "Florida Faceoff — Shriners Hospital Charity",
+      "when": "Brooksville, FL",
+      "kind": "tournament",
+      "status": "upcoming",
+      "detail": "Charity tournament supporting Shriners Hospital."
+    },
+    {
+      "id": "marathon",
+      "date": "2026-11-06",
+      "title": "Marathon Game (48 hours, streamed)",
+      "when": "All streamed",
+      "kind": "special",
+      "status": "upcoming",
+      "detail": "48-hour minimum marathon game, fully streamed."
+    },
+    {
+      "id": "fall-end",
+      "date": "2026-12-04",
+      "title": "Florida Challengers League season ends",
+      "when": "Fall season wrap",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Fall season closes. Stats and attendance feed January PLW evaluation."
+    },
+    {
+      "id": "dec-tourney",
+      "date": "2026-12-05",
+      "title": "PLW Tournament",
+      "when": "Brooksville, FL",
+      "kind": "tournament",
+      "status": "upcoming",
+      "detail": "December tournament on the PLW calendar."
+    },
+    {
+      "id": "plw-launch",
+      "date": "2027-01-15",
+      "title": "PLW Weeknight League & Pro Circuit launch",
+      "when": "Mid-January 2027",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Full PLW weeknight stream league. Fall 2026 is the ramp-up; real league reset in February."
+    }
+  ]
+}

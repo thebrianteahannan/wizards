@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Wizards of Wiff</title>
+    <meta
+      name="description"
+      content="Team hub for The Wizards of Wiff — Florida Challengers League Fall 2026."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Outfit:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/styles.css?v=19" />
+  </head>
+  <body>
+    <div class="grid-bg" aria-hidden="true"></div>
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="cursor-glow" aria-hidden="true"></div>
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="scan" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="#/">
+        <img src="/favicon.svg" alt="" width="44" height="44" />
+        <span>
+          <small>The</small>
+          Wizards
+          <em>of Wiff</em>
+        </span>
+      </a>
+      <button class="nav-toggle" type="button" aria-label="Open menu">Menu</button>
+      <nav class="nav">
+        <a href="#/">Home</a>
+        <a href="#/roster">Roster</a>
+        <a href="#/schedule">Schedule</a>
+        <a href="#/availability" data-need="team" hidden>League Night</a>
+        <a href="#/board" data-need="team" hidden>Board</a>
+        <a href="#/media">Media</a>
+        <a href="#/gear">Gear</a>
+        <a href="#/dues" data-need="team" hidden>Dues</a>
+        <a href="#/admin" data-need="admin" hidden>Admin</a>
+        <a href="#/league">League</a>
+      </nav>
+      <form id="team-gate" class="team-gate">
+        <input name="password" type="password" autocomplete="off" aria-label="Team password" placeholder="Password" />
+        <button class="btn ghost" type="submit">Enter</button>
+        <span id="gate-msg" class="muted"></span>
+      </form>
+      <span id="team-status" class="team-status" hidden></span>
+      <button id="team-leave" class="btn ghost" type="button" hidden>Leave</button>
+    </header>
+    <main id="app"></main>
+    <footer class="site-footer">
+      <p>The Wizards of Wiff · Florida Challengers League · Fall 2026 · Brooksville</p>
+      <p class="motto">Play Hard. Have Fun. Respect All.</p>
+    </footer>
+    <script src="/js/api.js?v=19"></script>
+    <script src="/js/auth.js?v=19"></script>
+    <script src="/js/pages.js?v=19"></script>
+    <script src="/js/availability.js?v=19"></script>
+    <script src="/js/board.js?v=19"></script>
+    <script src="/js/fees.js?v=19"></script>
+    <script src="/js/schedule.js?v=19"></script>
+    <script src="/js/visual.js?v=19"></script>
+    <script src="/js/app.js?v=19"></script>
+  </body>
+</html>

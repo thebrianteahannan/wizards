@@ -1,0 +1,40 @@
+{
+  "posts": [
+    {
+      "id": "p1",
+      "authorId": "tony-kurtanick",
+      "authorName": "Tony Kurtanick",
+      "createdAt": "2026-08-10T18:00:00.000Z",
+      "category": "Announcement",
+      "title": "Co-managers",
+      "body": "Tony Kurtanick and Brian Hannan are co-managers this season. Reach either of us for roster, fees, and league-night calls. Dues go to Brian."
+    },
+    {
+      "id": "p2",
+      "authorId": "tony-kurtanick",
+      "authorName": "Tony Kurtanick",
+      "createdAt": "2026-08-10T18:05:00.000Z",
+      "category": "League",
+      "title": "Fall 2026 is the ramp-up",
+      "body": "$250 per team for the year. This stretch is practice and getting equipment and teams ramped up. The real league reset is in February, with the PLW weeknight stream league launching in January 2027."
+    },
+    {
+      "id": "p3",
+      "authorId": "tony-kurtanick",
+      "authorName": "Tony Kurtanick",
+      "createdAt": "2026-08-12T16:00:00.000Z",
+      "category": "Gear",
+      "title": "Approved turf shoes",
+      "body": "The 3n2 MOFO turf shoe is the approved style for anyone who wants a matching pair. Around $89. No spikes or metal cleats at PLW events — turf shoes or sneakers only."
+    },
+    {
+      "id": "p4",
+      "authorId": "tony-kurtanick",
+      "authorName": "Tony Kurtanick",
+      "createdAt": "2026-08-06T23:00:00.000Z",
+      "category": "Watch",
+      "title": "Opening night stream",
+      "body": "Florida Fall League Opening Night was August 6 at 7pm EST, live on Twitch. Replay: twitch.tv/videos/2834716125 — follow twitch.tv/premierwiffle."
+    }
+  ]
+}
