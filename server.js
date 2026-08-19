@@ -1,11 +1,16 @@
 const path = require("path");
 const express = require("express");
 const { init, readJson, writeJson, status } = require("./store");
+const { attachAuth, requireTeam, requireAdmin, resolvePlayer } = require("./accounts");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "200kb" }));
+attachAuth(app);
+app.get("/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf", requireTeam, (req, res) => {
+  res.sendFile(path.join(__dirname, "public/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf"));
+});
 app.use(express.static(path.join(__dirname, "public")));
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
@@ -17,6 +22,15 @@ async function rosterById() {
   const map = {};
   for (const p of roster.players) map[p.id] = p;
   return { roster, map };
+}
+
+async function playerOrFail(req, res) {
+  const player = await resolvePlayer(req.user);
+  if (!player) {
+    res.status(400).json({ error: "Your login is not linked to a roster name. Ask a manager." });
+    return null;
+  }
+  return player;
 }
 
 app.get("/api/roster", async (_req, res) => {
@@ -105,14 +119,53 @@ app.get("/api/availability", async (req, res) => {
   res.json(await readJson(AVAIL_FILES[availKind(req)]));
 });
 
-app.get("/api/activity", async (_req, res) => {
+function clockLabel(t) {
+  const m = String(t || "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return "";
+  let h = Number(m[1]);
+  const min = m[2];
+  if (h < 0 || h > 23) return "";
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return h + ":" + min + " " + ampm;
+}
+
+app.post("/api/practice", requireTeam, async (req, res) => {
+  const date = String((req.body && req.body.date) || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Pick a date" });
+  const label = clockLabel(req.body && req.body.time);
+  if (!label) return res.status(400).json({ error: "Pick a time" });
+  const location = String((req.body && req.body.location) || "").trim().slice(0, 80);
+  if (location.length < 2) return res.status(400).json({ error: "Add a location" });
+  const player = await resolvePlayer(req.user);
+  const who = (player && player.name) || req.user.username;
+  const weekday = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][
+    new Date(date + "T12:00:00").getDay()
+  ];
+  const avail = await readJson("practice.json");
+  avail.offers = Array.isArray(avail.offers) ? avail.offers : [];
+  if (avail.offers.length >= 60) return res.status(400).json({ error: "Too many sessions. Delete an old one first." });
+  avail.offers.push({
+    date,
+    day: weekday,
+    note: location + " · " + label,
+    times: [label],
+    location,
+    time: label,
+    createdBy: who,
+  });
+  avail.offers.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  await writeJson("practice.json", avail);
+  res.json(avail);
+});
+
+app.get("/api/activity", requireTeam, async (_req, res) => {
   res.json(await readActivity());
 });
 
-app.put("/api/availability/:playerId", async (req, res) => {
-  const { map } = await rosterById();
-  const player = map[req.params.playerId];
-  if (!player) return res.status(404).json({ error: "Unknown player" });
+app.put("/api/availability/:playerId", requireTeam, async (req, res) => {
+  const player = await playerOrFail(req, res);
+  if (!player) return;
 
   const days = req.body && req.body.days;
   if (!days || typeof days !== "object") {
@@ -158,11 +211,9 @@ app.put("/api/availability/:playerId", async (req, res) => {
   res.json(avail);
 });
 
-app.post("/api/lock-night", async (req, res) => {
-  const { map } = await rosterById();
-  const player = map[req.body && req.body.playerId];
-  if (!player) return res.status(404).json({ error: "Unknown player" });
-  if (player.role !== "Co-manager") {
+app.post("/api/lock-night", requireTeam, async (req, res) => {
+  const player = await resolvePlayer(req.user);
+  if (req.user.role !== "admin" && (!player || player.role !== "Co-manager")) {
     return res.status(403).json({ error: "Only co-managers can lock a league night" });
   }
 
@@ -183,27 +234,26 @@ app.post("/api/lock-night", async (req, res) => {
   avail.lockedNight = {
     day,
     window: windowId,
-    lockedBy: player.name,
+    lockedBy: (player && player.name) || req.user.username,
     lockedAt: new Date().toISOString(),
   };
   await writeJson(file, avail);
   res.json(avail);
 });
 
-app.get("/api/board", async (_req, res) => {
+app.get("/api/board", requireTeam, async (_req, res) => {
   res.json(await readJson("announcements.json"));
 });
 
 const JERSEY_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"];
 
-app.get("/api/jerseys", async (_req, res) => {
+app.get("/api/jerseys", requireTeam, async (_req, res) => {
   res.json(await readJson("jerseys.json"));
 });
 
-app.post("/api/jerseys", async (req, res) => {
-  const { map } = await rosterById();
-  const player = map[req.body && req.body.playerId];
-  if (!player) return res.status(404).json({ error: "Unknown player" });
+app.post("/api/jerseys", requireTeam, async (req, res) => {
+  const player = await playerOrFail(req, res);
+  if (!player) return;
 
   const number = Number.parseInt(String(req.body.number ?? ""), 10);
   if (!Number.isInteger(number) || number < 0 || number > 99) {
@@ -231,10 +281,10 @@ app.post("/api/jerseys", async (req, res) => {
   res.json(data);
 });
 
-app.post("/api/board", async (req, res) => {
-  const { map } = await rosterById();
-  const player = map[req.body && req.body.authorId];
-  if (!player) return res.status(404).json({ error: "Unknown player" });
+app.post("/api/board", requireTeam, async (req, res) => {
+  const player = await resolvePlayer(req.user);
+  const authorId = player ? player.id : req.user.id;
+  const authorName = player ? player.name : req.user.username;
 
   const title = String(req.body.title || req.body.body || "").trim().slice(0, 120);
   const body = String(req.body.body || "").trim().slice(0, 2000);
@@ -244,8 +294,8 @@ app.post("/api/board", async (req, res) => {
   const board = await readJson("announcements.json");
   board.posts.unshift({
     id: "p" + Date.now(),
-    authorId: player.id,
-    authorName: player.name,
+    authorId,
+    authorName,
     createdAt: new Date().toISOString(),
     category,
     title,
@@ -255,7 +305,7 @@ app.post("/api/board", async (req, res) => {
   res.json(board);
 });
 
-app.get("/api/contacts", async (_req, res) => {
+app.get("/api/contacts", requireTeam, async (_req, res) => {
   res.json(await readJson("contacts.json"));
 });
 
@@ -298,7 +348,7 @@ function parseRecruit(body, requirePhone) {
   };
 }
 
-app.get("/api/recruits", async (_req, res) => {
+app.get("/api/recruits", requireTeam, async (_req, res) => {
   res.json(await readJson("recruits.json"));
 });
 
@@ -315,7 +365,7 @@ app.post("/api/recruits", async (req, res) => {
   res.json(data);
 });
 
-app.put("/api/recruits/:id", async (req, res) => {
+app.put("/api/recruits/:id", requireTeam, async (req, res) => {
   const parsed = parseRecruit(req.body, false);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
   const data = await readJson("recruits.json");
@@ -332,17 +382,13 @@ app.put("/api/recruits/:id", async (req, res) => {
 
 const FEE_MODELS = ["flat", "split", "core", "play"];
 
-app.get("/api/fees", async (_req, res) => {
+app.get("/api/fees", requireTeam, async (_req, res) => {
   res.json(await readJson("fees.json"));
 });
 
-app.put("/api/fees", async (req, res) => {
+app.put("/api/fees", requireAdmin, async (req, res) => {
   const { map } = await rosterById();
-  const player = map[req.body && req.body.playerId];
-  if (!player) return res.status(404).json({ error: "Unknown player" });
-  if (player.role !== "Co-manager") {
-    return res.status(403).json({ error: "Only co-managers can change the fee model" });
-  }
+  const player = await resolvePlayer(req.user);
 
   const model = FEE_MODELS.includes(req.body.model) ? req.body.model : "flat";
   const num = (value, fallback) => {
@@ -366,14 +412,14 @@ app.put("/api/fees", async (req, res) => {
     expectedNights: Math.max(1, num(req.body.expectedNights, 10)),
     perNight: req.body.perNight === null || req.body.perNight === "" ? null : num(req.body.perNight, 0),
     note: String(req.body.note || "").trim().slice(0, 500),
-    updatedBy: player.name,
+    updatedBy: (player && player.name) || req.user.username,
     updatedAt: new Date().toISOString(),
   };
   await writeJson("fees.json", fees);
   res.json(fees);
 });
 
-app.put("/api/fees/ledger", async (req, res) => {
+app.put("/api/fees/ledger", requireAdmin, async (req, res) => {
   const { map } = await rosterById();
   const incoming = req.body && req.body.ledger;
   if (!incoming || typeof incoming !== "object") {

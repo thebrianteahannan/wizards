@@ -37,10 +37,7 @@ function renderChatMessages(board, meId) {
 }
 
 function renderBoard(roster, board, playerId) {
-  const savedId = playerId || "";
-  const options = [`<option value="">Who are you?</option>`]
-    .concat(roster.players.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`))
-    .join("");
+  const savedId = playerId || (session && session.id) || "";
   const cats = ["General", "Announcement", "League", "Gear", "Ride", "Watch"]
     .map((c, i) => `<option ${i === 0 ? "selected" : ""}>${c}</option>`)
     .join("");
@@ -52,7 +49,6 @@ function renderBoard(roster, board, playerId) {
       <div class="chat-thread" id="chat-thread">${renderChatMessages(board, savedId)}</div>
       <form class="chat-composer" id="board-form">
         <div class="chat-who">
-          <select name="authorId" id="chat-author">${options}</select>
           <select name="category">${cats}</select>
         </div>
         <div class="chat-send">
@@ -65,21 +61,11 @@ function renderBoard(roster, board, playerId) {
   `;
 }
 
-function bindBoard(roster, skipAsk) {
+function bindBoard(roster) {
   const form = document.getElementById("board-form");
   const thread = document.getElementById("chat-thread");
   if (!form || !thread) return;
-  if (!skipAsk) {
-    askWho(roster.players, async (id) => {
-      form.authorId.value = id;
-      rememberPlayerId(id);
-      try {
-        const board = await api.get("/api/board");
-        thread.innerHTML = renderChatMessages(board, id);
-        thread.scrollTop = thread.scrollHeight;
-      } catch (_) {}
-    });
-  }
+  const meId = () => sessionPlayerId(roster.players) || (session && session.id) || "";
   thread.scrollTop = thread.scrollHeight;
   if (window.boardTimer) clearInterval(window.boardTimer);
   window.boardTimer = setInterval(async () => {
@@ -89,8 +75,7 @@ function bindBoard(roster, skipAsk) {
     }
     try {
       const board = await api.get("/api/board");
-      const me = form.authorId.value || suggestedPlayerId();
-      const html = renderChatMessages(board, me);
+      const html = renderChatMessages(board, meId());
       if (thread.innerHTML !== html) {
         const stick = thread.scrollHeight - thread.scrollTop < thread.clientHeight + 90;
         thread.innerHTML = html;
@@ -98,22 +83,14 @@ function bindBoard(roster, skipAsk) {
       }
     } catch (_) {}
   }, 4000);
-  form.authorId.addEventListener("change", () => {
-    if (form.authorId.value) rememberPlayerId(form.authorId.value);
-  });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     const msg = document.getElementById("board-msg");
-    if (!data.authorId) {
-      msg.textContent = "Pick who you are first.";
-      return;
-    }
-    rememberPlayerId(data.authorId);
     data.title = data.body.slice(0, 48);
     try {
       const board = await api.send("/api/board", "POST", data);
-      thread.innerHTML = renderChatMessages(board, data.authorId);
+      thread.innerHTML = renderChatMessages(board, meId());
       thread.scrollTop = thread.scrollHeight;
       form.body.value = "";
       form.body.focus();

@@ -124,7 +124,9 @@ button, select, input, textarea { font: inherit; color: var(--ink); }
 }
 .who-card .btn { width: 100%; margin-top: 0.7rem; }
 .team-gate { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
-.team-gate[hidden], #team-leave[hidden], .btn[hidden] { display: none; }
+#team-login, #team-who { font-family: var(--sport); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; }
+#team-login { color: var(--cyan); }
+.team-gate[hidden], #team-leave[hidden], #team-login[hidden], #team-who[hidden], .btn[hidden] { display: none; }
 .team-gate input {
   width: 8.6rem; min-width: 0; flex: 1; background: #070a14; border: 1px solid var(--line);
   border-radius: 999px; padding: 0.3rem 0.7rem;
@@ -506,7 +508,7 @@ a.cal-pill:hover { filter: brightness(1.2); }
 @media (max-width: 1400px) {
   .site-header { flex-wrap: wrap; }
   .nav-toggle { display: inline-flex; flex-direction: column; margin-left: auto; }
-  .team-gate { order: 3; flex: 1 1 11rem; }
+  .team-gate, #team-login, #team-who, #team-leave { order: 3; }
   .nav {
     display: none; position: absolute; top: 72px; right: 12px; flex-direction: column;
     background: #070a14; padding: 0.8rem 1rem; border: 1px solid var(--line); border-radius: 12px;

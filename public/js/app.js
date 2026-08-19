@@ -13,11 +13,13 @@ const routes = {
   "/admin": "admin",
   "/league": "league",
   "/strategy": "strategy",
+  "/login": "login",
   "/join": "join",
   "/recruits": "recruits",
 };
 
 async function load() {
+  await refreshSession();
   const hash = (location.hash.replace(/^#/, "") || "/").split("?")[0];
   const route = routes[hash] || "home";
   syncGates();
@@ -62,9 +64,9 @@ async function load() {
       } else {
         const kind = route === "availability" ? "league" : route;
         const [roster, avail] = await Promise.all([api.get("/api/roster"), api.get("/api/availability?kind=" + kind)]);
-        const me = suggestedPlayerId(roster.players);
+        const me = sessionPlayerId(roster.players);
         app.innerHTML = await renderAvailability(roster, avail, me, kind);
-        bindAvailability(roster, !!me, kind, avail);
+        bindAvailability(roster, !me, kind, avail);
       }
     } else if (route === "activity") {
       if (!isTeam()) {
@@ -80,7 +82,7 @@ async function load() {
         bindPageLock("team");
       } else {
         const [roster, board] = await Promise.all([api.get("/api/roster"), api.get("/api/board")]);
-        const me = suggestedPlayerId(roster.players);
+        const me = sessionPlayerId(roster.players);
         app.innerHTML = renderBoard(roster, board, me);
         bindBoard(roster, !!me);
       }
@@ -92,7 +94,7 @@ async function load() {
         bindPageLock("team");
       } else {
         const [roster, jerseys] = await Promise.all([api.get("/api/roster"), api.get("/api/jerseys")]);
-        const me = suggestedPlayerId(roster.players);
+        const me = sessionPlayerId(roster.players);
         app.innerHTML = renderGear(roster, jerseys, me);
         bindGear(roster, !!me);
       }
@@ -108,20 +110,27 @@ async function load() {
     } else if (route === "admin") {
       if (!isAdmin()) {
         app.innerHTML = renderLock("admin");
-        bindPageLock("admin");
+        bindPageLock();
       } else {
         const [roster, fees] = await Promise.all([api.get("/api/roster"), api.get("/api/fees")]);
-        const me = suggestedPlayerId(roster.players.filter((p) => p.role === "Co-manager"));
-        app.innerHTML = renderAdmin(roster, fees, me);
-        bindAdmin(roster, !!me);
+        app.innerHTML = renderAdmin(roster, fees) + '<div id="users-panel"></div>';
+        bindAdmin(roster);
+        await reloadUsers();
       }
     } else if (route === "strategy") {
       if (!isTeam()) {
         app.innerHTML = renderLock("team");
-        bindPageLock("team");
       } else {
-        app.innerHTML = renderStrategy();
+        const data = await api.get("/api/strategy");
+        app.innerHTML = renderStrategy(data);
       }
+    } else if (route === "login") {
+      if (isTeam()) {
+        location.hash = "#/";
+        return;
+      }
+      app.innerHTML = renderLogin();
+      bindLogin();
     } else if (route === "league") {
       app.innerHTML = renderLeague();
     } else if (route === "join") {

@@ -7,15 +7,22 @@ function writeWhoCookie(id) {
   document.cookie = "wizardsWho=" + encodeURIComponent(id) + ";path=/;max-age=31536000;SameSite=Lax";
 }
 
+function sessionPlayerId(players) {
+  const id = (session && session.playerId) || "";
+  if (!id) return "";
+  if (players && players.length && !players.some((p) => p.id === id)) return "";
+  return id;
+}
+
+function sessionPlayerName(players) {
+  const id = sessionPlayerId(players);
+  const hit = (players || []).find((p) => p.id === id);
+  if (hit) return hit.name;
+  return (session && (session.playerName || session.username)) || "";
+}
+
 function suggestedPlayerId(players) {
-  const saved = readWhoCookie();
-  const local = localStorage.getItem("wizardsPlayerId") || "";
-  if (players && players.length) {
-    const hit = players.find((p) => p.id === saved || p.id === local || p.name === saved || playerLabel(p) === saved);
-    if (hit) return hit.id;
-    return "";
-  }
-  return local || saved || "";
+  return sessionPlayerId(players);
 }
 
 function rememberPlayerId(id) {
@@ -30,36 +37,6 @@ function clearWhoModal() {
 }
 
 function askWho(players, onPick) {
-  const suggested = suggestedPlayerId(players);
-  if (suggested && players.some((p) => p.id === suggested)) {
-    rememberPlayerId(suggested);
-    onPick(suggested);
-    return;
-  }
-  clearWhoModal();
-  const opts = [`<option value="">Select a Wizard</option>`]
-    .concat(players.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(playerLabel(p))}</option>`))
-    .join("");
-  const wrap = document.createElement("div");
-  wrap.id = "who-modal";
-  wrap.className = "who-modal";
-  wrap.innerHTML = `
-    <form class="card who-card">
-      <p class="kicker">Roster check</p>
-      <h2>Who are you?</h2>
-      <p class="muted">Pick your name. We’ll remember it on this device.</p>
-      <div class="form-row">
-        <select name="who" required>${opts}</select>
-      </div>
-      <button class="btn" type="submit">That’s me</button>
-    </form>`;
-  document.body.appendChild(wrap);
-  wrap.querySelector("form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const id = String(new FormData(e.target).get("who") || "").trim();
-    if (!id) return;
-    rememberPlayerId(id);
-    wrap.remove();
-    onPick(id);
-  });
+  const id = sessionPlayerId(players);
+  if (id) onPick(id);
 }

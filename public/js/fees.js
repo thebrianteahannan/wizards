@@ -81,7 +81,7 @@ function feeBreakdown(roster, fees) {
 function renderDues(roster, fees, showLedger) {
   const { model, total, rows, collected } = feeBreakdown(roster, fees);
   const meta = FEE_MODELS[model];
-  const due = fees.dueDate ? fmtDate(fees.dueDate) : "when Tony or Brian call it";
+  const due = fees.dueDate ? fmtDate(fees.dueDate) : "when Brian calls it";
   const ledger = fees.ledger || {};
   const open = !!(showLedger && isAdmin());
   const headline =
@@ -118,13 +118,13 @@ function renderDues(roster, fees, showLedger) {
     <section class="grid-3">
       <article class="card stat"><b>${headline}</b>${escapeHtml(meta.label)}</article>
       <article class="card stat"><b>${due}</b>due date</article>
-      <article class="card stat"><b>Pay</b>${escapeHtml(fees.payTo || "a co-manager")}</article>
+      <article class="card stat"><b>Pay</b>${escapeHtml(fees.payTo || "Brian")}</article>
     </section>
     <section class="grid-2" style="margin-top:1rem">
       <article class="card">
         <h2>${escapeHtml(meta.label)}</h2>
         <p>${escapeHtml(meta.blurb)}</p>
-        <p><strong>How:</strong> ${escapeHtml(fees.method || "Ask a co-manager")}</p>
+        <p><strong>How:</strong> ${escapeHtml(fees.method || "Ask Brian")}</p>
         ${fees.note ? `<p class="muted">${escapeHtml(fees.note)}</p>` : ""}
         ${model !== "play" ? `<p class="muted">At this roster size the flat/split take is ${money(collected)} against a ${money(total)} bill.</p>` : ""}
       </article>
@@ -149,7 +149,7 @@ function renderDues(roster, fees, showLedger) {
           <li>The league fee is a team bill, not a per-game ticket from PLW.</li>
           <li>Jerseys and turf shoes are on you. This page is only the ${money(total)} club fee.</li>
           <li>If you are on the roster, you are in the current model until a manager changes it.</li>
-          <li>${isAdmin() ? `Co-managers can switch models on the <a href="#/admin">Admin</a> page.` : "Co-managers set the model. Ping Tony or Brian if yours looks wrong."}</li>
+          <li>${isAdmin() ? `Brian can switch models on the <a href="#/admin">Admin</a> page.` : "Brian sets the model. Ping him if yours looks wrong."}</li>
         </ul>
     </article>
     <div class="who-bar" style="margin-top:1.4rem">
@@ -190,7 +190,11 @@ function bindDues(roster, fees, showLedger) {
         redrawDues(roster, fees, true);
         return;
       }
-      if (lock) lock.hidden = false;
+      if (lock) {
+        lock.hidden = false;
+        const msg = document.getElementById("ledger-lock-msg");
+        if (msg) msg.textContent = "Log in as a manager to open the ledger.";
+      }
     });
   }
   if (lock) {
@@ -198,13 +202,7 @@ function bindDues(roster, fees, showLedger) {
       e.preventDefault();
       const password = String(new FormData(lock).get("password") || "").trim();
       const msg = document.getElementById("ledger-lock-msg");
-      if (password === "2323") {
-        setAdmin(true);
-        syncGates();
-        redrawDues(roster, fees, true);
-        return;
-      }
-      if (msg) msg.textContent = "Wrong password.";
+      if (msg) msg.textContent = "Log in as a manager.";
     });
   }
   if (hide) {
@@ -230,12 +228,7 @@ function bindDues(roster, fees, showLedger) {
   }
 }
 
-function renderAdmin(roster, fees, playerId) {
-  const managers = roster.players.filter((p) => p.role === "Co-manager");
-  const savedId = playerId || "";
-  const options = [`<option value="">Who are you?</option>`]
-    .concat(managers.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(p.name)}</option>`))
-    .join("");
+function renderAdmin(roster, fees) {
   const modelRadios = Object.entries(FEE_MODELS)
     .map(
       ([id, m]) => `
@@ -253,15 +246,13 @@ function renderAdmin(roster, fees, playerId) {
     })
     .join("");
   return `
-    <p class="kicker">Co-managers</p>
+    <p class="kicker">Site admin</p>
     <h1>Admin</h1>
     <p class="lede">Switch how the ${money(fees.teamTotal || 250)} team fee is split. Players see the result on <a href="#/dues">Dues</a>.</p>
     <section class="card">
-      <form id="fees-form">
-        <div class="form-row">
-          <label>I am</label>
-          <select name="playerId">${options}</select>
-        </div>
+      <details>
+        <summary style="cursor:pointer">Fee model</summary>
+        <form id="fees-form" style="margin-top:0.8rem">
         <p class="muted">Pick a model</p>
         <div class="model-grid">${modelRadios}</div>
         <div class="grid-2" style="margin-top:1rem">
@@ -308,21 +299,15 @@ function renderAdmin(roster, fees, playerId) {
         </div>
         <button class="btn" type="submit">Save fee model</button>
         <p id="fees-msg" class="muted">${fees.updatedBy ? "Last saved by " + escapeHtml(fees.updatedBy) : ""}</p>
-      </form>
+        </form>
+      </details>
     </section>
   `;
 }
 
-function bindAdmin(roster, skipAsk) {
+function bindAdmin(roster) {
   const form = document.getElementById("fees-form");
   if (!form) return;
-  if (!skipAsk) {
-    const managers = roster.players.filter((p) => p.role === "Co-manager");
-    askWho(managers, (id) => {
-      form.playerId.value = id;
-      rememberPlayerId(id);
-    });
-  }
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const raw = new FormData(form);
@@ -331,15 +316,11 @@ function bindAdmin(roster, skipAsk) {
     body.corePlayerIds = corePlayerIds;
     body.perNight = body.perNight === "" ? null : body.perNight;
     const msg = document.getElementById("fees-msg");
-    if (!body.playerId) {
-      msg.textContent = "Pick who you are first.";
-      return;
-    }
-    rememberPlayerId(body.playerId);
     try {
       const fees = await api.send("/api/fees", "PUT", body);
-      document.getElementById("app").innerHTML = renderAdmin(roster, fees, body.playerId);
-      bindAdmin(roster, true);
+      document.getElementById("app").innerHTML = renderAdmin(roster, fees) + '<div id="users-panel"></div>';
+      bindAdmin(roster);
+      reloadUsers();
       document.getElementById("fees-msg").textContent = "Saved. Dues page now matches this model.";
     } catch (err) {
       msg.textContent = err.message;

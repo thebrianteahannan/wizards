@@ -22,10 +22,10 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
   const team = isTeam();
   const hudNight = best ? `${best.yes}/6 · ${cap(best.day)}` : "0/6";
   const actions = team
-    ? `<a class="btn" href="#/availability">Set your nights</a><a class="btn ghost" href="#/board">Announcements</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`
+    ? `<a class="btn" href="#/availability">Set your days</a><a class="btn ghost" href="#/board">Announcements</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`
     : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`;
   const nightCard = team
-    ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>League night</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
+    ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>League</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
     : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>PLW Info</h3><p class="muted">Fall tryouts. Real League in January.</p></a>`;
   const duesCard = team
     ? `<a class="card feature" href="#/dues"><span class="icon">$</span><h3>Dues</h3><p class="muted">${fees && fees.model === "flat" ? money(fees.flatAmount) + " flat for the year" : "$250 team bill"}</p></a>`
@@ -41,10 +41,10 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
     ? `<a class="card stat" href="#/dues"><b>${fees ? money(fees.model === "flat" ? fees.flatAmount : fees.teamTotal) : "$250"}</b>${fees && fees.model === "flat" ? "flat dues this year" : "team fee for the year"}</a>`
     : "";
   const pulse = team
-    ? `<article class="card"><p class="kicker">Availability pulse</p><h2>${best && best.yes >= 6 ? "We can field a night" : "Still hunting a night"}</h2><p>${best ? `<span class="${best.yes >= 6 ? "ok" : "warn"}">${best.yes} yes / ${best.maybe} maybe</span> on ${cap(best.day)} ${best.window}` : "Nobody has filled nights yet. Grab League Night and tap your week."}</p><p class="muted">Fall league is flexible weeknights and weekends until the lights are fully in.</p></article>`
-    : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League Night, announcements, and dues open with the team password in the header.</p></article>`;
+    ? `<article class="card"><p class="kicker">Availability pulse</p><h2>${best && best.yes >= 6 ? "We can field a night" : "Still hunting a night"}</h2><p>${best ? `<span class="${best.yes >= 6 ? "ok" : "warn"}">${best.yes} yes / ${best.maybe} maybe</span> on ${cap(best.day)} ${best.window}` : "Nobody has filled nights yet. Grab League and tap your week."}</p><p class="muted">Fall league is flexible weeknights and weekends until the lights are fully in.</p></article>`
+    : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League, announcements, and dues open with the team password in the header.</p></article>`;
   return `
-    ${team && locked ? `<div class="banner"><strong>League night locked:</strong> ${escapeHtml(cap(locked.day))} ${escapeHtml(locked.window)} — set by ${escapeHtml(locked.lockedBy)}</div>` : ""}
+    ${team && locked ? `<div class="banner"><strong>League locked:</strong> ${escapeHtml(cap(locked.day))} ${escapeHtml(locked.window)} — set by ${escapeHtml(locked.lockedBy)}</div>` : ""}
     <section class="hero">
       <div class="hero-copy">
         <p class="kicker">Florida Challengers League · Fall 2026</p>
@@ -155,7 +155,7 @@ function renderSchedule(schedule, avail, view, monthKey) {
       </div>
       <button class="btn ghost" type="button" id="sched-view">${view === "calendar" ? "List view" : "Calendar view"}</button>
     </div>
-    <p class="lede">${isTeam() ? `Tournaments and league dates. Recurring weeknight is chosen on <a href="#/availability">League Night</a> once six Wizards overlap.` : "Tournaments and league dates on the PLW calendar."}</p>
+    <p class="lede">${isTeam() ? `Tournaments and league dates. Recurring weeknight is chosen on <a href="#/availability">League</a> once six Wizards overlap.` : "Tournaments and league dates on the PLW calendar."}</p>
     ${isTeam() ? lock : ""}
     ${view === "calendar" ? renderCalendarMonth(events, monthKey) : `<div class="timeline" style="margin-top:1rem">${list}</div>`}
   `;
@@ -198,9 +198,6 @@ function renderMedia() {
 function renderGear(roster, jerseys, playerId) {
   const savedId = playerId || "";
   const mine = (jerseys.requests || []).find((r) => r.playerId === savedId);
-  const options = [`<option value="">Who are you?</option>`]
-    .concat(roster.players.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`))
-    .join("");
   const sizes = ["S", "M", "L", "XL", "2XL", "3XL"]
     .map((s) => `<option ${mine && mine.size === s ? "selected" : ""}>${s}</option>`)
     .join("");
@@ -228,10 +225,6 @@ function renderGear(roster, jerseys, playerId) {
         <p>Deep purple pinstripe alternate with the wizard crest — pointed hat, wooden bat, wiffle ball, gold “WIFF!”. White shoulders, PLW patch, tournament patch. Matching kits matter for photos and the best-dressed purse at the End of Summer Showdown.</p>
         <p class="muted">Wear the purple. Photographers notice the teams that look like a club.</p>
         <form id="jersey-form" style="margin-top:1rem">
-          <div class="form-row">
-            <label for="jersey-player">I am</label>
-            <select id="jersey-player" name="playerId">${options}</select>
-          </div>
           <div class="grid-2">
             <div class="form-row">
               <label for="jersey-number">Preferred number</label>
@@ -247,7 +240,7 @@ function renderGear(roster, jerseys, playerId) {
           </div>
           <p class="muted">${escapeHtml(takenNote)}</p>
           <div class="actions">
-            <button class="btn" type="submit">Request jersey</button>
+            <button class="btn" type="submit" ${savedId ? "" : "disabled"}>Request jersey</button>
           </div>
           <p id="jersey-msg" class="muted"></p>
         </form>
@@ -274,37 +267,21 @@ function takenJerseyNumbers(roster, jerseys) {
   for (const r of jerseys.requests || []) seen.set(r.number, r.playerName);
   return [...seen.entries()].sort((a, b) => a[0] - b[0]).map(([number, name]) => ({ number, name }));
 }
-function bindGear(roster, skipAsk) {
+function bindGear(roster) {
   const form = document.getElementById("jersey-form");
   if (!form) return;
-  const playerSelect = document.getElementById("jersey-player");
-  const numberInput = document.getElementById("jersey-number");
-  const redraw = async (id) => {
-    rememberPlayerId(id);
-    const next = await api.get("/api/jerseys");
-    document.getElementById("app").innerHTML = renderGear(roster, next, id);
-    bindGear(roster, true);
-  };
-  if (!skipAsk) askWho(roster.players, (id) => redraw(id));
-  playerSelect.addEventListener("change", () => {
-    if (!playerSelect.value) return;
-    rememberPlayerId(playerSelect.value);
-    const player = roster.players.find((p) => p.id === playerSelect.value);
-    if (player && player.number != null && !numberInput.value) numberInput.value = player.number;
-  });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     const msg = document.getElementById("jersey-msg");
-    if (!data.playerId) {
-      msg.textContent = "Pick who you are first.";
+    if (!sessionPlayerId(roster.players)) {
+      msg.textContent = "Your login is not linked to a roster name.";
       return;
     }
-    rememberPlayerId(data.playerId);
     try {
       const next = await api.send("/api/jerseys", "POST", data);
-      document.getElementById("app").innerHTML = renderGear(roster, next, data.playerId);
-      bindGear(roster, true);
+      document.getElementById("app").innerHTML = renderGear(roster, next, sessionPlayerId(roster.players));
+      bindGear(roster);
     } catch (err) {
       msg.textContent = err.message;
     }
@@ -351,22 +328,20 @@ function renderLeague() {
   `;
 }
 
-function renderStrategy() {
+function renderStrategy(data) {
+  data = data || {};
+  const rules = (data.rules || []).map((r) => `<li>${escapeHtml(r)}</li>`).join("");
+  const pdf = data.pdf
+    ? `<p><a href="${escapeHtml(data.pdf)}" target="_blank" rel="noopener">August 1 tournament packet (PDF)</a></p>`
+    : "";
   return `
     <p class="kicker">Team only</p>
     <h1>Strategy</h1>
-    <p class="lede">How these games are actually decided. Keep it in the book so we play the same way.</p>
+    <p class="lede">${escapeHtml(data.lede || "")}</p>
     <section class="card" style="max-width:40rem">
       <h2>Rules that decide games</h2>
-      <ul class="rules">
-        <li>Every at-bat starts 0–1. Six innings.</li>
-        <li>Called strikes must read ≤55 mph and hit the K-zone in the air.</li>
-        <li>Walk 2 batters → pitcher is done (last eligible pitcher has no walk cap).</li>
-        <li>No gloves. Force outs: ball into backstop / K-zone / batter in the air within 5 seconds.</li>
-        <li>Only official yellow Wiffle bats. Legal tape only.</li>
-        <li>Motto: Play Hard. Have Fun. Respect All.</li>
-      </ul>
-      <p><a href="/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf" target="_blank" rel="noopener">August 1 tournament packet (PDF)</a></p>
+      <ul class="rules">${rules}</ul>
+      ${pdf}
     </section>
   `;
 }

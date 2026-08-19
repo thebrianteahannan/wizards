@@ -40,7 +40,7 @@ done
 rm -rf "$STAGING" "$ZIP"
 mkdir -p "$STAGING/public"
 
-cp "$ROOT/server.js" "$ROOT/store.js" "$ROOT/package.json" "$ROOT/package-lock.json" "$STAGING/"
+cp "$ROOT/server.js" "$ROOT/store.js" "$ROOT/accounts.js" "$ROOT/package.json" "$ROOT/package-lock.json" "$STAGING/"
 rsync -a --exclude '.DS_Store' "$ROOT/public/" "$STAGING/public/"
 
 if [[ "$INCLUDE_DATA" -eq 1 ]]; then

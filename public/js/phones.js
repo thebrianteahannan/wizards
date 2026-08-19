@@ -2,7 +2,7 @@ function bindPhones(roster) {
   const btn = document.getElementById("show-phones");
   const box = document.getElementById("phone-list");
   if (!btn || !box) return;
-  btn.addEventListener("click", async () => {
+  btn.onclick = async () => {
     if (!box.hidden) {
       box.hidden = true;
       btn.textContent = "Phone numbers";
@@ -28,5 +28,5 @@ function bindPhones(roster) {
       box.hidden = false;
       box.innerHTML = `<p class="muted">${escapeHtml(err.message)}</p>`;
     }
-  });
+    };
 }

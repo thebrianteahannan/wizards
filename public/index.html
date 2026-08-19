@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Outfit:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/styles.css?v=43" />
+    <link rel="stylesheet" href="/css/styles.css?v=48" />
   </head>
   <body>
     <div class="grid-bg" aria-hidden="true"></div>
@@ -36,7 +36,7 @@
         <a href="#/">Home</a>
         <a href="#/roster">Roster</a>
         <a href="#/schedule">Schedule</a>
-        <a href="#/availability" data-need="team" hidden>League Night</a>
+        <a href="#/availability" data-need="team" hidden>League</a>
         <a href="#/tournament" data-need="team" hidden>Tournament</a>
         <a href="#/practice" data-need="team" hidden>Practice</a>
         <a href="#/board" data-need="team" hidden>Announcements</a>
@@ -49,11 +49,8 @@
         <a href="#/strategy" data-need="team" hidden>Strategy</a>
         <a href="#/league">PLW Info</a>
       </nav>
-      <form id="team-gate" class="team-gate">
-        <input name="password" type="password" autocomplete="off" aria-label="Team password" placeholder="Password" />
-        <button class="btn ghost" type="submit">Enter</button>
-        <span id="gate-msg" class="muted"></span>
-      </form>
+      <a href="#/login" id="team-login">Log in</a>
+      <span id="team-who" class="muted" hidden></span>
       <button id="team-leave" class="btn ghost" type="button" hidden>Log Out</button>
     </header>
     <main id="app"></main>
@@ -61,18 +58,19 @@
       <p>The Wizards of Wiff · Florida Challengers League · Fall 2026 · Brooksville</p>
       <p class="motto">Play Hard. Have Fun. Respect All.</p>
     </footer>
-    <script src="/js/api.js?v=25"></script>
-    <script src="/js/who.js?v=36"></script>
-    <script src="/js/auth.js?v=32"></script>
-    <script src="/js/pages.js?v=45"></script>
+    <script src="/js/api.js?v=48"></script>
+    <script src="/js/who.js?v=37"></script>
+    <script src="/js/auth.js?v=49"></script>
+    <script src="/js/login.js?v=53"></script>
+    <script src="/js/pages.js?v=52"></script>
     <script src="/js/roster.js?v=37"></script>
-    <script src="/js/availability.js?v=43"></script>
-    <script src="/js/board.js?v=35"></script>
-    <script src="/js/fees.js?v=36"></script>
+    <script src="/js/availability.js?v=49"></script>
+    <script src="/js/board.js?v=36"></script>
+    <script src="/js/fees.js?v=52"></script>
     <script src="/js/join.js?v=39"></script>
-    <script src="/js/phones.js?v=33"></script>
-    <script src="/js/schedule.js?v=37"></script>
+    <script src="/js/phones.js?v=34"></script>
+    <script src="/js/schedule.js?v=38"></script>
     <script src="/js/visual.js?v=25"></script>
-    <script src="/js/app.js?v=47"></script>
+    <script src="/js/app.js?v=49"></script>
   </body>
 </html>

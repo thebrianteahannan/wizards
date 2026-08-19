@@ -1,7 +1,7 @@
 const AVAIL_META = {
   league: {
     kind: "league",
-    title: "League night",
+    title: "League",
     lede: "Mark the windows Adam sent. Green at NEED yes.",
     from: "From Adam",
     board: "Windows on the board",
@@ -75,7 +75,7 @@ function lockLabel(day) {
 function availTabs(kind) {
   return `
     <div class="actions" style="margin-top:0">
-      <a class="btn ghost${kind === "league" ? " on" : ""}" href="#/availability">League Night</a>
+      <a class="btn ghost${kind === "league" ? " on" : ""}" href="#/availability">League</a>
       <a class="btn ghost${kind === "tournament" ? " on" : ""}" href="#/tournament">Tournament</a>
       <a class="btn ghost${kind === "practice" ? " on" : ""}" href="#/practice">Practice</a>
     </div>
@@ -86,11 +86,8 @@ async function renderAvailability(roster, avail, playerId, kind) {
   const page = availPage(kind);
   const savedId = playerId || "";
   const mine = (savedId && avail.players[savedId] && avail.players[savedId].days) || {};
-  const options = [`<option value="">Who are you?</option>`]
-    .concat(roster.players.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`))
-    .join("");
   const locked = avail.lockedNight;
-  const isManager = (roster.players.find((p) => p.id === savedId) || {}).role === "Co-manager";
+  const isManager = isAdmin() || (roster.players.find((p) => p.id === savedId) || {}).role === "Co-manager";
   const needed = avail.needed || 6;
 
   const offers = [...(avail.offers || [])].sort((a, b) => String(a.date || a.day).localeCompare(String(b.date || b.day)));
@@ -149,6 +146,29 @@ async function renderAvailability(roster, avail, playerId, kind) {
     <h1>${escapeHtml(page.title)}</h1>
     <p class="lede">${escapeHtml(page.lede.replace("NEED", String(needed)))}</p>
     ${availTabs(page.kind)}
+    ${page.kind === "practice" ? `
+    <section class="card">
+      <h2>New session</h2>
+      <p class="muted">Any Wizard can post a practice. Others tap Yes / Maybe / No on the card.</p>
+      <form id="practice-add">
+        <div class="grid-2">
+          <div class="form-row">
+            <label>Date</label>
+            <input name="date" type="date" required />
+          </div>
+          <div class="form-row">
+            <label>Time</label>
+            <input name="time" type="time" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Location</label>
+          <input name="location" required maxlength="80" placeholder="Field, park, or address" />
+        </div>
+        <button class="btn" type="submit">Add practice</button>
+        <p id="practice-add-msg" class="muted"></p>
+      </form>
+    </section>` : ""}
     ${offers.length ? `<section class="card adam-offers">
       <p class="kicker">${escapeHtml(page.from)}</p>
       <h2>${escapeHtml(page.board)}</h2>
@@ -159,18 +179,42 @@ async function renderAvailability(roster, avail, playerId, kind) {
           : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
         return `<li><strong>${Number.isNaN(d.getTime()) ? "" : d.getDate()}</strong> ${escapeHtml(label)} — ${escapeHtml(o.note)}</li>`;
       }).join("")}</ul>
-    </section>` : `<p class="muted">No dates on the board yet.</p>`}
+    </section>` : page.kind === "practice" ? "" : `<p class="muted">No dates on the board yet.</p>`}
     ${locked ? `<div class="banner">Locked: <strong>${escapeHtml(lockLabel(locked.day))} ${escapeHtml(locked.window)}</strong> by ${escapeHtml(locked.lockedBy)}. ${isManager ? '<button class="btn ghost" id="clear-lock" type="button">Clear lock</button>' : ""}</div>` : ""}
     <form id="avail-form">
-      <div class="who-bar">
-        <label for="player-id">I am</label>
-        <select id="player-id" name="playerId">${options}</select>
-        <button class="btn" type="submit">${escapeHtml(page.save)}</button>
-        <p id="avail-msg" class="muted"></p>
-      </div>
+      <p id="avail-msg" class="muted"></p>
       <div class="day-grid">${dayCols}</div>
     </form>
   `;
+}
+
+function paintLiveDay(card, avail, roster) {
+  const day = card.dataset.day;
+  card.querySelectorAll(".seg label").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
+  const status = (card.querySelector(`input[name="st-${day}"]:checked`) || {}).value || "no";
+  const boxes = [...card.querySelectorAll(`input[name="w-${day}"]`)];
+  if (status !== "no" && boxes.length && !boxes.some((b) => b.checked)) {
+    boxes.forEach((b) => {
+      b.checked = true;
+    });
+  }
+  const myId = sessionPlayerId(roster.players);
+  const myName = sessionPlayerName(roster.players);
+  const names = { yes: new Set(), maybe: new Set() };
+  for (const [id, p] of Object.entries((avail && avail.players) || {})) {
+    if (id === myId) continue;
+    const entry = (p.days || {})[day] || {};
+    if (entry.status === "yes") names.yes.add(p.name || id);
+    else if (entry.status === "maybe") names.maybe.add(p.name || id);
+  }
+  if (status === "yes" && myName) names.yes.add(myName);
+  else if (status === "maybe" && myName) names.maybe.add(myName);
+  const chips = [...names.yes]
+    .map((n) => `<span class="chip yes">${escapeHtml(n)}</span>`)
+    .concat([...names.maybe].map((n) => `<span class="chip maybe">${escapeHtml(n)}?</span>`))
+    .join("");
+  const el = card.querySelector(".chips");
+  if (el) el.innerHTML = chips || '<span class="muted">Empty</span>';
 }
 
 function firstWindowOffer(avail) {
@@ -240,9 +284,8 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   const page = availPage(kind);
   const form = document.getElementById("avail-form");
   if (!form) return;
-  const select = document.getElementById("player-id");
+  const me = sessionPlayerId(roster.players);
   const redraw = async (id, skip, focusDate) => {
-    rememberPlayerId(id);
     const [r, a] = await Promise.all([api.get("/api/roster"), api.get(availApi(page.kind))]);
     document.getElementById("app").innerHTML = await renderAvailability(r, a, id, page.kind);
     bindAvailability(r, skip, page.kind, a);
@@ -259,55 +302,62 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     if (first && !answered) askFirstWindow(id, first, avail, page.kind, (focusDate) => redraw(id, true, focusDate));
     else if (after) after();
   };
-  if (!skipAsk) {
-    askWho(roster.players, (id) => {
-      promptFirst(id, () => redraw(id, true));
-    });
-  } else if (select.value) {
-    promptFirst(select.value);
-  }
-  select.addEventListener("change", async () => {
-    if (!select.value) return;
-    await redraw(select.value, true);
-  });
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const playerId = select.value;
+  if (me && !skipAsk) promptFirst(me);
+  let saveN = 0;
+  form.addEventListener("change", (e) => {
+    const card = e.target.closest("article.day");
+    if (!card) return;
+    paintLiveDay(card, avail, roster);
+    const playerId = sessionPlayerId(roster.players);
+    const msg = document.getElementById("avail-msg");
     if (!playerId) {
-      document.getElementById("avail-msg").textContent = "Pick who you are first.";
+      if (msg) msg.textContent = "Your login is not linked to a roster name.";
       return;
     }
-    rememberPlayerId(playerId);
-    const days = {};
-    form.querySelectorAll("article.day[data-day]").forEach((card) => {
-      const day = card.dataset.day;
-      const status = (form.querySelector(`input[name="st-${day}"]:checked`) || {}).value || "no";
-      let windows = [...form.querySelectorAll(`input[name="w-${day}"]:checked`)].map((i) => i.value);
-      if (status !== "no" && windows.length === 0) {
-        windows = [...form.querySelectorAll(`input[name="w-${day}"]`)].map((i) => i.value);
-      }
-      days[day] = { status, windows };
-    });
-    const msg = document.getElementById("avail-msg");
-    try {
-      const avail = await api.send("/api/availability/" + playerId, "PUT", { days, kind: page.kind });
-      document.getElementById("app").innerHTML = await renderAvailability(roster, avail, playerId, page.kind);
-      bindAvailability(roster, true, page.kind, avail);
-      document.getElementById("avail-msg").textContent = "Saved.";
-    } catch (err) {
-      msg.textContent = err.message;
+    const day = card.dataset.day;
+    const status = (card.querySelector(`input[name="st-${day}"]:checked`) || {}).value || "no";
+    let windows = [...card.querySelectorAll(`input[name="w-${day}"]:checked`)].map((i) => i.value);
+    if (status !== "no" && windows.length === 0) {
+      windows = [...card.querySelectorAll(`input[name="w-${day}"]`)].map((i) => i.value);
     }
+    const n = ++saveN;
+    if (msg) msg.textContent = "Saving…";
+    api.send("/api/availability/" + playerId, "PUT", { days: { [day]: { status, windows } }, kind: page.kind })
+      .then((next) => {
+        if (n !== saveN) return;
+        if (next && next.players) avail.players = next.players;
+        if (msg) msg.textContent = "Saved.";
+      })
+      .catch((err) => {
+        if (msg) msg.textContent = err.message;
+      });
   });
+  form.querySelectorAll("article.day").forEach((card) => paintLiveDay(card, avail, roster));
+  form.addEventListener("submit", (e) => e.preventDefault());
+  const add = document.getElementById("practice-add");
+  if (add) {
+    add.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById("practice-add-msg");
+      const body = Object.fromEntries(new FormData(add).entries());
+      try {
+        const next = await api.send("/api/practice", "POST", body);
+        document.getElementById("app").innerHTML = await renderAvailability(roster, next, sessionPlayerId(roster.players), "practice");
+        bindAvailability(roster, true, "practice", next);
+      } catch (err) {
+        if (msg) msg.textContent = err.message;
+      }
+    });
+  }
   document.querySelectorAll("[data-lock]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
         const avail = await api.send("/api/lock-night", "POST", {
-          playerId: select.value,
           kind: page.kind,
           day: btn.dataset.lock,
           window: btn.dataset.window,
         });
-        document.getElementById("app").innerHTML = await renderAvailability(roster, avail, select.value, page.kind);
+        document.getElementById("app").innerHTML = await renderAvailability(roster, avail, sessionPlayerId(roster.players), page.kind);
         bindAvailability(roster, true, page.kind, avail);
       } catch (err) {
         alert(err.message);
@@ -317,8 +367,8 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   const clear = document.getElementById("clear-lock");
   if (clear) {
     clear.addEventListener("click", async () => {
-      const avail = await api.send("/api/lock-night", "POST", { playerId: select.value, kind: page.kind, clear: true });
-      document.getElementById("app").innerHTML = await renderAvailability(roster, avail, select.value, page.kind);
+      const avail = await api.send("/api/lock-night", "POST", { kind: page.kind, clear: true });
+      document.getElementById("app").innerHTML = await renderAvailability(roster, avail, sessionPlayerId(roster.players), page.kind);
       bindAvailability(roster, true, page.kind, avail);
     });
   }
@@ -331,7 +381,7 @@ function bindAvailability(roster, skipAsk, kind, avail) {
 }
 
 function renderActivity(log) {
-  const labels = { league: "League Night", tournament: "Tournament", practice: "Practice" };
+  const labels = { league: "League", tournament: "Tournament", practice: "Practice" };
   const rows = (log.entries || [])
     .map((e) => {
       const d = new Date(e.at);
@@ -352,7 +402,7 @@ function renderActivity(log) {
   return `
     <p class="kicker">Team only</p>
     <h1>Activity log</h1>
-    <p class="lede">Every League Night, Tournament, and Practice save. Newest first. This lives in data/ with the rest of the live files.</p>
+    <p class="lede">Every League, Tournament, and Practice save. Newest first. This lives in data/ with the rest of the live files.</p>
     ${availTabs("activity")}
     <div class="timeline">${rows || '<p class="muted">No saves logged yet. Once someone hits Save, it shows up here.</p>'}</div>
   `;

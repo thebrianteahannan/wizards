@@ -14,6 +14,8 @@ const FILES = [
   "recruits.json",
   "fees.json",
   "activity.json",
+  "accounts.json",
+  "strategy.json",
 ];
 
 let url = "";
@@ -103,12 +105,14 @@ async function readJson(file) {
       return value;
     }
     if (file === "activity.json") return { entries: [] };
+    if (file === "accounts.json") return { users: [], sessions: [], resets: [], inviteCode: "" };
     throw new Error("Missing data: " + file);
   }
   try {
     return JSON.parse(fs.readFileSync(path.join(DATA, file), "utf8"));
   } catch (err) {
     if (file === "activity.json") return { entries: [] };
+    if (file === "accounts.json") return { users: [], sessions: [], resets: [], inviteCode: "" };
     throw err;
   }
 }

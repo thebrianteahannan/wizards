@@ -16,15 +16,25 @@ function renderCalendarMonth(events, monthKey) {
     const pills = hits
       .map((e) => {
         const cls = `cal-pill ${e.kind} ${e.status}`;
-        const label = escapeHtml(e.title);
+        const title = escapeHtml(e.title);
         if (isTeam()) {
           const path = e.kind === "tournament" || e.kind === "special" ? "tournament" : e.kind === "practice" ? "practice" : "availability";
-          return `<a class="${cls}" href="#/${path}?date=${escapeHtml(e.date)}" title="${label}">${label}</a>`;
+          return `<a class="${cls}" href="#/${path}?date=${escapeHtml(e.date)}" title="${title}">${title}</a>`;
         }
-        return `<span class="${cls}" title="${label}">${label}</span>`;
+        return `<span class="${cls}" title="${title}">${title}</span>`;
       })
       .join("");
-    cells.push(`<div class="cal-cell ${hits.length ? "has" : ""}"><span class="cal-n">${d}</span>${pills}</div>`);
+    if (hits.length === 1 && isTeam()) {
+      const e = hits[0];
+      const path = e.kind === "tournament" || e.kind === "special" ? "tournament" : e.kind === "practice" ? "practice" : "availability";
+      const href = `#/${path}?date=${escapeHtml(e.date)}`;
+      const title = escapeHtml(e.title);
+      cells.push(
+        `<a class="cal-cell has" href="${href}" style="color:inherit;text-decoration:none;cursor:pointer"><span class="cal-n">${d}</span><span class="cal-pill ${e.kind} ${e.status}" title="${title}">${title}</span></a>`
+      );
+    } else {
+      cells.push(`<div class="cal-cell ${hits.length ? "has" : ""}"><span class="cal-n">${d}</span>${pills}</div>`);
+    }
   }
   const heads = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((h) => `<div class="cal-h">${h}</div>`).join("");
   return `

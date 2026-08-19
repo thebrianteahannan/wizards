@@ -1,24 +1,21 @@
+let session = null;
+
 function isTeam() {
-  return localStorage.getItem("wizardsTeam") === "1";
+  return !!(session && session.active);
 }
 
 function isAdmin() {
-  return isTeam() && localStorage.getItem("wizardsAdmin") === "1";
+  return !!(session && session.role === "admin");
 }
 
-function setTeam(on) {
-  if (on) localStorage.setItem("wizardsTeam", "1");
-  else {
-    localStorage.removeItem("wizardsTeam");
-    localStorage.removeItem("wizardsAdmin");
+async function refreshSession() {
+  try {
+    session = await api.get("/api/auth/me");
+  } catch (_) {
+    session = null;
   }
-}
-
-function setAdmin(on) {
-  if (on) {
-    localStorage.setItem("wizardsTeam", "1");
-    localStorage.setItem("wizardsAdmin", "1");
-  } else localStorage.removeItem("wizardsAdmin");
+  syncGates();
+  return session;
 }
 
 function syncGates() {
@@ -29,9 +26,14 @@ function syncGates() {
     el.hidden = !isAdmin();
   });
   const leave = document.getElementById("team-leave");
-  const form = document.getElementById("team-gate");
+  const login = document.getElementById("team-login");
+  const who = document.getElementById("team-who");
   if (leave) leave.hidden = !isTeam();
-  if (form) form.hidden = isTeam();
+  if (login) login.hidden = isTeam();
+  if (who) {
+    who.hidden = !isTeam();
+    who.textContent = session ? session.username : "";
+  }
   const join = document.getElementById("nav-join");
   if (join) join.textContent = isTeam() ? "Recruit" : "Join";
 }
@@ -41,71 +43,28 @@ function renderLock(kind) {
   return `
     <section class="card lock-card">
       <p class="kicker">${admin ? "Managers only" : "Wizards only"}</p>
-      <h1>${admin ? "Admin lock" : "Team lock"}</h1>
-      <p class="lede">${admin ? "Enter the admin password to change dues and club settings." : "Enter the team password to open League Night, announcements, and dues."}</p>
-      <form id="page-lock" class="lock-form">
-        <input name="password" type="password" autocomplete="off" placeholder="Password" required />
-        <button class="btn" type="submit">Unlock</button>
-        <p class="lock-msg muted"></p>
-      </form>
-    </section>
-  `;
+      <h1>Log in</h1>
+      <p class="lede">${admin ? "This page is for Brian." : "Each Wizard has a username and password. The old shared password is retired so someone who leaves cannot take the club with them."}</p>
+      <div class="actions">
+        <a class="btn" href="#/login">Log in</a>
+      </div>
+    </section>`;
 }
 
-function bindPageLock(kind) {
-  const form = document.getElementById("page-lock");
-  if (!form) return;
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const password = String(new FormData(form).get("password") || "").trim();
-    const msg = form.querySelector(".lock-msg");
-    if (kind === "admin" && password === "2323") {
-      setAdmin(true);
-      syncGates();
-      location.hash = "#/admin";
-      load();
-      return;
-    }
-    if (kind !== "admin" && (password.toLowerCase() === "pineapple" || password === "2323")) {
-      if (password === "2323") setAdmin(true);
-      else setTeam(true);
-      syncGates();
-      load();
-      return;
-    }
-    msg.textContent = "Wrong password.";
-  });
-}
+function bindPageLock() {}
 
 function bindHeaderGate() {
-  const form = document.getElementById("team-gate");
   const leave = document.getElementById("team-leave");
-  if (form) {
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const password = String(new FormData(form).get("password") || "").trim();
-      const msg = document.getElementById("gate-msg");
-      if (password === "2323") {
-        setAdmin(true);
-        syncGates();
-        load();
-        return;
-      }
-      if (password.toLowerCase() === "pineapple") {
-        setTeam(true);
-        syncGates();
-        load();
-        return;
-      }
-      if (msg) msg.textContent = "Nope.";
-    });
-  }
   if (leave) {
-    leave.addEventListener("click", () => {
-      setTeam(false);
+    leave.addEventListener("click", async () => {
+      try {
+        await api.send("/api/auth/logout", "POST", {});
+      } catch (_) {}
+      session = null;
       syncGates();
-      if (/availability|tournament|practice|activity|board|dues|admin|recruits|gear|strategy/.test(location.hash)) location.hash = "#/";
-      else load();
+      if (/availability|tournament|practice|activity|board|dues|admin|recruits|gear|strategy|login/.test(location.hash)) {
+        location.hash = "#/";
+      } else load();
     });
   }
   syncGates();
