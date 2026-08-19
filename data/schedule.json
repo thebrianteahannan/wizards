@@ -33,6 +33,42 @@
       "detail": "PLW free agent / tryout day for the Florida Challengers League."
     },
     {
+      "id": "aug22-series",
+      "date": "2026-08-22",
+      "title": "Possible series — before the tournament",
+      "when": "1:00 PM or 5:00 PM",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Adam’s window for a series before End of Summer Showdown."
+    },
+    {
+      "id": "aug23-series",
+      "date": "2026-08-23",
+      "title": "Possible series — before the tournament",
+      "when": "1:00 PM or 5:00 PM",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Sunday option. 1pm or 5pm."
+    },
+    {
+      "id": "aug24-blitz",
+      "date": "2026-08-24",
+      "title": "Wizards vs Blitz",
+      "when": "Monday league night",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Adam’s Monday option."
+    },
+    {
+      "id": "aug25-dembois",
+      "date": "2026-08-25",
+      "title": "Wizards vs Dem Bois",
+      "when": "Tuesday league night",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Adam’s Tuesday option."
+    },
+    {
       "id": "eos-showdown",
       "date": "2026-08-29",
       "title": "End of Summer Showdown",
@@ -40,6 +76,15 @@
       "kind": "tournament",
       "status": "upcoming",
       "detail": "Team entry $250. Three-game guarantee. Champion $1,500. Best-dressed awards. 21+."
+    },
+    {
+      "id": "sep4-flamingos",
+      "date": "2026-09-04",
+      "title": "Flamingos vs Wizards",
+      "when": "6:00 · 6:50 · 7:40 PM",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Adam’s Friday window. Three games on the board."
     },
     {
       "id": "sep-tourney",

@@ -14,7 +14,15 @@ function renderCalendarMonth(events, monthKey) {
     const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const hits = byDay[iso] || [];
     const pills = hits
-      .map((e) => `<span class="cal-pill ${e.kind} ${e.status}" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</span>`)
+      .map((e) => {
+        const cls = `cal-pill ${e.kind} ${e.status}`;
+        const label = escapeHtml(e.title);
+        if (isTeam()) {
+          const path = e.kind === "tournament" || e.kind === "special" ? "tournament" : e.kind === "practice" ? "practice" : "availability";
+          return `<a class="${cls}" href="#/${path}?date=${escapeHtml(e.date)}" title="${label}">${label}</a>`;
+        }
+        return `<span class="${cls}" title="${label}">${label}</span>`;
+      })
       .join("");
     cells.push(`<div class="cal-cell ${hits.length ? "has" : ""}"><span class="cal-n">${d}</span>${pills}</div>`);
   }

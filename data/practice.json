@@ -1,0 +1,12 @@
+{
+  "needed": 6,
+  "windows": [
+    { "id": "afternoon", "label": "Afternoon", "hint": "12–5" },
+    { "id": "evening", "label": "Evening", "hint": "5–9" },
+    { "id": "night", "label": "Night", "hint": "9–11" }
+  ],
+  "days": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+  "players": {},
+  "lockedNight": null,
+  "offers": []
+}

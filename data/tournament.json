@@ -1,0 +1,17 @@
+{
+  "needed": 6,
+  "windows": [
+    { "id": "afternoon", "label": "Afternoon", "hint": "12–5" },
+    { "id": "evening", "label": "Evening", "hint": "5–9" },
+    { "id": "night", "label": "Night", "hint": "9–11" }
+  ],
+  "days": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+  "players": {},
+  "lockedNight": null,
+  "offers": [
+    { "date": "2026-08-29", "day": "saturday", "note": "End of Summer Showdown · 10 AM", "times": ["10 AM"] },
+    { "date": "2026-09-26", "day": "saturday", "note": "PLW Tournament · Brooksville" },
+    { "date": "2026-10-17", "day": "saturday", "note": "Florida Faceoff · Shriners Hospital Charity" },
+    { "date": "2026-12-05", "day": "saturday", "note": "PLW Tournament · Brooksville" }
+  ]
+}

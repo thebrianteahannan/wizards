@@ -102,7 +102,7 @@ function bindHeaderGate() {
     leave.addEventListener("click", () => {
       setTeam(false);
       syncGates();
-      if (/availability|board|dues|admin|recruits/.test(location.hash)) location.hash = "#/";
+      if (/availability|tournament|practice|board|dues|admin|recruits/.test(location.hash)) location.hash = "#/";
       else load();
     });
   }

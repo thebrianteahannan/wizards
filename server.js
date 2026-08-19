@@ -39,8 +39,27 @@ app.get("/api/schedule", (_req, res) => {
   res.json(readJson("schedule.json"));
 });
 
-app.get("/api/availability", (_req, res) => {
-  res.json(readJson("availability.json"));
+const AVAIL_FILES = {
+  league: "availability.json",
+  tournament: "tournament.json",
+  practice: "practice.json",
+};
+
+function availKind(req) {
+  const k = (req.query && req.query.kind) || (req.body && req.body.kind) || "league";
+  return AVAIL_FILES[k] ? k : "league";
+}
+
+function isDayKey(key) {
+  return DAYS.includes(key) || /^\d{4}-\d{2}-\d{2}$/.test(key);
+}
+
+function isWindowId(w) {
+  return WINDOWS.includes(w) || /^t-[a-z0-9-]{1,32}$/.test(String(w || ""));
+}
+
+app.get("/api/availability", (req, res) => {
+  res.json(readJson(AVAIL_FILES[availKind(req)]));
 });
 
 app.put("/api/availability/:playerId", (req, res) => {
@@ -53,23 +72,35 @@ app.put("/api/availability/:playerId", (req, res) => {
     return res.status(400).json({ error: "days object required" });
   }
 
-  const clean = {};
+  const file = AVAIL_FILES[availKind(req)];
+  const avail = readJson(file);
+  const prev = ((avail.players[player.id] || {}).days) || {};
+  const clean = { ...prev };
   for (const day of DAYS) {
+    if (!Object.prototype.hasOwnProperty.call(days, day)) continue;
     const entry = days[day] || {};
     const status = STATUSES.includes(entry.status) ? entry.status : "no";
     const windows = Array.isArray(entry.windows)
-      ? entry.windows.filter((w) => WINDOWS.includes(w))
+      ? entry.windows.filter((w) => isWindowId(w)).slice(0, 8)
       : [];
     clean[day] = { status, windows: status === "no" ? [] : windows };
   }
+  for (const key of Object.keys(days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+    const entry = days[key] || {};
+    const status = STATUSES.includes(entry.status) ? entry.status : "no";
+    const windows = Array.isArray(entry.windows)
+      ? entry.windows.filter((w) => isWindowId(w)).slice(0, 8)
+      : [];
+    clean[key] = { status, windows: status === "no" ? [] : windows };
+  }
 
-  const avail = readJson("availability.json");
   avail.players[player.id] = {
     name: player.name,
     updatedAt: new Date().toISOString(),
     days: clean,
   };
-  writeJson("availability.json", avail);
+  writeJson(file, avail);
   res.json(avail);
 });
 
@@ -81,16 +112,17 @@ app.post("/api/lock-night", (req, res) => {
     return res.status(403).json({ error: "Only co-managers can lock a league night" });
   }
 
-  const avail = readJson("availability.json");
+  const file = AVAIL_FILES[availKind(req)];
+  const avail = readJson(file);
   if (req.body.clear) {
     avail.lockedNight = null;
-    writeJson("availability.json", avail);
+    writeJson(file, avail);
     return res.json(avail);
   }
 
   const day = req.body.day;
   const windowId = req.body.window;
-  if (!DAYS.includes(day) || !WINDOWS.includes(windowId)) {
+  if (!isDayKey(day) || !isWindowId(windowId)) {
     return res.status(400).json({ error: "Valid day and window required" });
   }
 
@@ -100,7 +132,7 @@ app.post("/api/lock-night", (req, res) => {
     lockedBy: player.name,
     lockedAt: new Date().toISOString(),
   };
-  writeJson("availability.json", avail);
+  writeJson(file, avail);
   res.json(avail);
 });
 
@@ -169,41 +201,77 @@ app.post("/api/board", (req, res) => {
   res.json(board);
 });
 
+app.get("/api/contacts", (_req, res) => {
+  res.json(readJson("contacts.json"));
+});
+
 const JOIN_POS = ["P", "C", "2B", "SS", "LF", "CF", "RF", "Util"];
+
+function parseRecruit(body, requirePhone) {
+  const firstName = String((body && body.firstName) || "").trim().slice(0, 40);
+  const lastName = String((body && body.lastName) || "").trim().slice(0, 40);
+  const number = Number.parseInt(String((body && body.number) ?? ""), 10);
+  const primary = String((body && body.primary) || "").trim();
+  const secondary = String((body && body.secondary) || "").trim();
+  const experience = String((body && body.experience) || "").trim().slice(0, 200);
+  const why = String((body && body.why) || "").trim().slice(0, 800);
+  const phone = String((body && body.phone) || "").trim().slice(0, 32);
+  const email = String((body && body.email) || "").trim().slice(0, 80);
+  const notes = String((body && body.notes) || "").trim().slice(0, 800);
+  if (!firstName || !lastName) return { error: "First and last name required" };
+  if (!Number.isInteger(number) || number < 0 || number > 99) {
+    return { error: "Jersey number must be 0-99" };
+  }
+  if (!JOIN_POS.includes(primary)) return { error: "Pick a primary position" };
+  if (secondary && !JOIN_POS.includes(secondary)) return { error: "Pick a valid secondary" };
+  if (requirePhone && !phone) return { error: "Phone number required" };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "Valid email or leave it blank" };
+  }
+  return {
+    value: {
+      firstName,
+      lastName,
+      number,
+      primary,
+      secondary: secondary || "",
+      experience,
+      why,
+      phone,
+      email,
+      notes,
+    },
+  };
+}
 
 app.get("/api/recruits", (_req, res) => {
   res.json(readJson("recruits.json"));
 });
 
 app.post("/api/recruits", (req, res) => {
-  const firstName = String((req.body && req.body.firstName) || "").trim().slice(0, 40);
-  const lastName = String((req.body && req.body.lastName) || "").trim().slice(0, 40);
-  const number = Number.parseInt(String((req.body && req.body.number) ?? ""), 10);
-  const primary = String((req.body && req.body.primary) || "").trim();
-  const secondary = String((req.body && req.body.secondary) || "").trim();
-  const experience = String((req.body && req.body.experience) || "").trim().slice(0, 200);
-  const why = String((req.body && req.body.why) || "").trim().slice(0, 800);
-  if (!firstName || !lastName) return res.status(400).json({ error: "First and last name required" });
-  if (!Number.isInteger(number) || number < 0 || number > 99) {
-    return res.status(400).json({ error: "Jersey number must be 0-99" });
-  }
-  if (!JOIN_POS.includes(primary)) return res.status(400).json({ error: "Pick a primary position" });
-  if (secondary && !JOIN_POS.includes(secondary)) return res.status(400).json({ error: "Pick a valid secondary" });
-  if (!experience) return res.status(400).json({ error: "Tell us how long you have been playing" });
-  if (!why) return res.status(400).json({ error: "Tell us why you want to play" });
-
+  const parsed = parseRecruit(req.body, true);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
   const data = readJson("recruits.json");
   data.recruits.unshift({
     id: "r" + Date.now(),
-    firstName,
-    lastName,
-    number,
-    primary,
-    secondary: secondary || "",
-    experience,
-    why,
+    ...parsed.value,
     createdAt: new Date().toISOString(),
   });
+  writeJson("recruits.json", data);
+  res.json(data);
+});
+
+app.put("/api/recruits/:id", (req, res) => {
+  const parsed = parseRecruit(req.body, false);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  const data = readJson("recruits.json");
+  const i = data.recruits.findIndex((r) => r.id === req.params.id);
+  if (i < 0) return res.status(404).json({ error: "Unknown recruit" });
+  data.recruits[i] = {
+    ...data.recruits[i],
+    ...parsed.value,
+    updatedAt: new Date().toISOString(),
+  };
   writeJson("recruits.json", data);
   res.json(data);
 });
@@ -247,6 +315,26 @@ app.put("/api/fees", (req, res) => {
     updatedBy: player.name,
     updatedAt: new Date().toISOString(),
   };
+  writeJson("fees.json", fees);
+  res.json(fees);
+});
+
+app.put("/api/fees/ledger", (req, res) => {
+  const { map } = rosterById();
+  const incoming = req.body && req.body.ledger;
+  if (!incoming || typeof incoming !== "object") {
+    return res.status(400).json({ error: "ledger required" });
+  }
+  const ledger = {};
+  for (const [id, row] of Object.entries(incoming)) {
+    if (!map[id]) continue;
+    const owed = Number(row && row.owed);
+    ledger[id] = {
+      owed: Number.isFinite(owed) && owed >= 0 ? Math.round(owed * 100) / 100 : 0,
+      comment: String((row && row.comment) || "").trim().slice(0, 240),
+    };
+  }
+  const fees = { ...readJson("fees.json"), ledger };
   writeJson("fees.json", fees);
   res.json(fees);
 });

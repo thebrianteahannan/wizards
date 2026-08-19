@@ -36,10 +36,10 @@ function renderChatMessages(board, meId) {
     .join("");
 }
 
-function renderBoard(roster, board) {
-  const savedId = localStorage.getItem("wizardsPlayerId") || roster.players[0].id;
-  const options = roster.players
-    .map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`)
+function renderBoard(roster, board, playerId) {
+  const savedId = playerId || "";
+  const options = [`<option value="">Who are you?</option>`]
+    .concat(roster.players.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`))
     .join("");
   const cats = ["General", "Announcement", "League", "Gear", "Ride", "Watch"]
     .map((c, i) => `<option ${i === 0 ? "selected" : ""}>${c}</option>`)
@@ -65,10 +65,21 @@ function renderBoard(roster, board) {
   `;
 }
 
-function bindBoard(roster) {
+function bindBoard(roster, skipAsk) {
   const form = document.getElementById("board-form");
   const thread = document.getElementById("chat-thread");
   if (!form || !thread) return;
+  if (!skipAsk) {
+    askWho(roster.players, async (id) => {
+      form.authorId.value = id;
+      rememberPlayerId(id);
+      try {
+        const board = await api.get("/api/board");
+        thread.innerHTML = renderChatMessages(board, id);
+        thread.scrollTop = thread.scrollHeight;
+      } catch (_) {}
+    });
+  }
   thread.scrollTop = thread.scrollHeight;
   if (window.boardTimer) clearInterval(window.boardTimer);
   window.boardTimer = setInterval(async () => {
@@ -78,7 +89,7 @@ function bindBoard(roster) {
     }
     try {
       const board = await api.get("/api/board");
-      const me = localStorage.getItem("wizardsPlayerId");
+      const me = form.authorId.value || suggestedPlayerId();
       const html = renderChatMessages(board, me);
       if (thread.innerHTML !== html) {
         const stick = thread.scrollHeight - thread.scrollTop < thread.clientHeight + 90;
@@ -88,14 +99,18 @@ function bindBoard(roster) {
     } catch (_) {}
   }, 4000);
   form.authorId.addEventListener("change", () => {
-    localStorage.setItem("wizardsPlayerId", form.authorId.value);
+    if (form.authorId.value) rememberPlayerId(form.authorId.value);
   });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
-    localStorage.setItem("wizardsPlayerId", data.authorId);
-    data.title = data.body.slice(0, 48);
     const msg = document.getElementById("board-msg");
+    if (!data.authorId) {
+      msg.textContent = "Pick who you are first.";
+      return;
+    }
+    rememberPlayerId(data.authorId);
+    data.title = data.body.slice(0, 48);
     try {
       const board = await api.send("/api/board", "POST", data);
       thread.innerHTML = renderChatMessages(board, data.authorId);

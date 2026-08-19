@@ -78,10 +78,12 @@ function feeBreakdown(roster, fees) {
   return { model, total, rows, collected };
 }
 
-function renderDues(roster, fees) {
+function renderDues(roster, fees, showLedger) {
   const { model, total, rows, collected } = feeBreakdown(roster, fees);
   const meta = FEE_MODELS[model];
   const due = fees.dueDate ? fmtDate(fees.dueDate) : "when Tony or Brian call it";
+  const ledger = fees.ledger || {};
+  const open = !!(showLedger && isAdmin());
   const headline =
     model === "play"
       ? rows[0]
@@ -91,16 +93,24 @@ function renderDues(roster, fees) {
         ? money(rows[0].amount) + " each"
         : money(0);
   const table = rows
-    .map(
-      (r) => `
+    .map((r) => {
+      const entry = ledger[r.id] || {};
+      const owed = entry.owed != null && entry.owed !== "" ? entry.owed : r.amount;
+      const extra = open
+        ? `<td><input class="ledger-owed" data-id="${escapeHtml(r.id)}" type="number" min="0" step="0.01" value="${escapeHtml(owed)}" /></td>
+        <td><input class="ledger-comment" data-id="${escapeHtml(r.id)}" maxlength="240" placeholder="Paid, waiting, Venmo later…" value="${escapeHtml(entry.comment || "")}" /></td>`
+        : "";
+      return `
       <tr>
         <td>${escapeHtml(r.name)}</td>
         <td><strong>${money(r.amount)}</strong></td>
         <td class="muted">${escapeHtml(r.when)}</td>
         <td class="muted">${escapeHtml(r.note)}</td>
-      </tr>`
-    )
+        ${extra}
+      </tr>`;
+    })
     .join("");
+  const headExtra = open ? "<th>Owes me</th><th>Comments</th>" : "";
   return `
     <p class="kicker">League dues</p>
     <h1>What you pay</h1>
@@ -142,21 +152,89 @@ function renderDues(roster, fees) {
           <li>${isAdmin() ? `Co-managers can switch models on the <a href="#/admin">Admin</a> page.` : "Co-managers set the model. Ping Tony or Brian if yours looks wrong."}</li>
         </ul>
     </article>
-    <h2 style="margin-top:1.4rem">Who owes what</h2>
+    <div class="who-bar" style="margin-top:1.4rem">
+      <h2 style="margin:0">Who owes what</h2>
+      ${open
+        ? `<button class="btn ghost" type="button" id="hide-ledger">Hide</button><button class="btn" type="button" id="save-ledger">Save ledger</button>`
+        : `<button class="btn" type="button" id="show-ledger">What they owe me</button>`}
+    </div>
+    <form id="ledger-lock" class="who-bar" hidden>
+      <input name="password" type="password" autocomplete="off" placeholder="Admin password" />
+      <button class="btn" type="submit">Unlock</button>
+      <p class="muted" id="ledger-lock-msg"></p>
+    </form>
+    <p id="ledger-msg" class="muted"></p>
     <div class="card" style="overflow:auto">
       <table class="dues-table">
-        <thead><tr><th>Player</th><th>Amount</th><th>When</th><th>Why</th></tr></thead>
+        <thead><tr><th>Player</th><th>Amount</th><th>When</th><th>Why</th>${headExtra}</tr></thead>
         <tbody>${table}</tbody>
       </table>
     </div>
   `;
 }
 
-function renderAdmin(roster, fees) {
+function redrawDues(roster, fees, showLedger) {
+  document.getElementById("app").innerHTML = renderDues(roster, fees, showLedger);
+  bindDues(roster, fees, showLedger);
+  if (window.bootVisuals) window.bootVisuals();
+}
+
+function bindDues(roster, fees, showLedger) {
+  const show = document.getElementById("show-ledger");
+  const hide = document.getElementById("hide-ledger");
+  const lock = document.getElementById("ledger-lock");
+  const save = document.getElementById("save-ledger");
+  if (show) {
+    show.addEventListener("click", () => {
+      if (isAdmin()) {
+        redrawDues(roster, fees, true);
+        return;
+      }
+      if (lock) lock.hidden = false;
+    });
+  }
+  if (lock) {
+    lock.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const password = String(new FormData(lock).get("password") || "").trim();
+      const msg = document.getElementById("ledger-lock-msg");
+      if (password === "2323") {
+        setAdmin(true);
+        syncGates();
+        redrawDues(roster, fees, true);
+        return;
+      }
+      if (msg) msg.textContent = "Wrong password.";
+    });
+  }
+  if (hide) {
+    hide.addEventListener("click", () => redrawDues(roster, fees, false));
+  }
+  if (save) {
+    save.addEventListener("click", async () => {
+      const ledger = {};
+      document.querySelectorAll(".ledger-owed").forEach((input) => {
+        const id = input.dataset.id;
+        const commentEl = document.querySelector(`.ledger-comment[data-id="${id}"]`);
+        ledger[id] = { owed: input.value, comment: commentEl ? commentEl.value : "" };
+      });
+      const msg = document.getElementById("ledger-msg");
+      try {
+        const next = await api.send("/api/fees/ledger", "PUT", { ledger });
+        redrawDues(roster, next, true);
+        document.getElementById("ledger-msg").textContent = "Saved.";
+      } catch (err) {
+        if (msg) msg.textContent = err.message;
+      }
+    });
+  }
+}
+
+function renderAdmin(roster, fees, playerId) {
   const managers = roster.players.filter((p) => p.role === "Co-manager");
-  const savedId = localStorage.getItem("wizardsPlayerId") || (managers[0] && managers[0].id);
-  const options = managers
-    .map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(p.name)}</option>`)
+  const savedId = playerId || "";
+  const options = [`<option value="">Who are you?</option>`]
+    .concat(managers.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(p.name)}</option>`))
     .join("");
   const modelRadios = Object.entries(FEE_MODELS)
     .map(
@@ -235,9 +313,16 @@ function renderAdmin(roster, fees) {
   `;
 }
 
-function bindAdmin(roster) {
+function bindAdmin(roster, skipAsk) {
   const form = document.getElementById("fees-form");
   if (!form) return;
+  if (!skipAsk) {
+    const managers = roster.players.filter((p) => p.role === "Co-manager");
+    askWho(managers, (id) => {
+      form.playerId.value = id;
+      rememberPlayerId(id);
+    });
+  }
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const raw = new FormData(form);
@@ -245,12 +330,16 @@ function bindAdmin(roster) {
     const body = Object.fromEntries(raw.entries());
     body.corePlayerIds = corePlayerIds;
     body.perNight = body.perNight === "" ? null : body.perNight;
-    localStorage.setItem("wizardsPlayerId", body.playerId);
     const msg = document.getElementById("fees-msg");
+    if (!body.playerId) {
+      msg.textContent = "Pick who you are first.";
+      return;
+    }
+    rememberPlayerId(body.playerId);
     try {
       const fees = await api.send("/api/fees", "PUT", body);
-      document.getElementById("app").innerHTML = renderAdmin(roster, fees);
-      bindAdmin(roster);
+      document.getElementById("app").innerHTML = renderAdmin(roster, fees, body.playerId);
+      bindAdmin(roster, true);
       document.getElementById("fees-msg").textContent = "Saved. Dues page now matches this model.";
     } catch (err) {
       msg.textContent = err.message;

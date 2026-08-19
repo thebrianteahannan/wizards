@@ -8,7 +8,7 @@ const DAYS_META = [
   ["sunday", "Sun"],
 ];
 
-function renderHome(roster, schedule, avail, fees) {
+function renderHome(roster, schedule, avail, fees, tourneyAvail) {
   const locked = avail.lockedNight;
   const today = new Date().toISOString().slice(0, 10);
   const next = (schedule.events || []).find((e) => e.date >= today) || (schedule.events || []).at(-1);
@@ -26,7 +26,7 @@ function renderHome(roster, schedule, avail, fees) {
     : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a>`;
   const nightCard = team
     ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>League night</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
-    : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>The league</h3><p class="muted">Florida Challengers League in Brooksville.</p></a>`;
+    : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>The league</h3><p class="muted">Fall tryouts. Real League in January.</p></a>`;
   const duesCard = team
     ? `<a class="card feature" href="#/dues"><span class="icon">$</span><h3>Dues</h3><p class="muted">${fees && fees.model === "flat" ? money(fees.flatAmount) + " flat for the year" : "$250 team bill"}</p></a>`
     : `<a class="card feature" href="#/gear"><span class="icon">$</span><h3>Gear</h3><p class="muted">Purple kits. Turf shoes. Request a jersey.</p></a>`;
@@ -42,7 +42,7 @@ function renderHome(roster, schedule, avail, fees) {
       <div class="hero-copy">
         <p class="kicker">Florida Challengers League · Fall 2026</p>
         <h1>Six on.<br /><span class="grad-text">Lights out.</span></h1>
-        <p class="lede">Purple pinstripes, yellow bats, six on the field. This is the Wizards control deck — roster, league nights, and the Brooksville run toward the January PLW weeknight league.</p>
+        <p class="lede">This fall is practice and tryouts. We are building the Wizards for PLW’s Real League, which starts January 2027.</p>
         <p class="muted">Co-managers Tony Kurtanick and Brian Hannan. ${roster.players.length} on the book. Need <strong>6 players the same night</strong> to take a league game.</p>
         <div class="actions">
           ${actions}
@@ -92,6 +92,9 @@ function renderHome(roster, schedule, avail, fees) {
       <article class="card stat"><b>6</b>needed for league night</article>
       ${duesStat}
     </section>
+    <section style="margin-top:1.2rem">
+      ${renderRosterEmbed(roster, localStorage.getItem("wizardsRosterSquad"), avail, tourneyAvail, "dg-home", "h2")}
+    </section>
     <section class="grid-2" style="margin-top:1rem">
       <article class="card">
         <p class="kicker">Next on the calendar</p>
@@ -109,8 +112,8 @@ function renderHome(roster, schedule, avail, fees) {
       </figure>
       <article class="card">
         <p class="kicker">What this season is</p>
-        <h2>Ramp-up now. Real league in Feb.</h2>
-        <p>PLW’s Florida Challengers League runs through December 4 in Brooksville. Stats, attendance, and how we show up all feed the January 2027 weeknight stream league. Jerseys are in. Turf shoes are approved. Opening night already hit Twitch.</p>
+        <h2>Practice league now. Real League in January.</h2>
+        <p>Florida Challengers League through December 4 is reps and tryouts — chemistry, nights we can field six, and who belongs on this club. The Real League starts January 2027. Everything we do in Brooksville this fall is to have a Wizards team ready for that.</p>
         <div class="actions">
           <a class="btn ghost" href="#/league">Rules &amp; stream</a>
           <a class="btn ghost" href="#/media">Gallery</a>
@@ -118,114 +121,6 @@ function renderHome(roster, schedule, avail, fees) {
       </article>
     </section>
   `;
-}
-
-function onSquad(p, squad) {
-  const s = p.squads || ["league"];
-  return s.includes(squad);
-}
-
-function rosterRows(players) {
-  return players
-    .map((p) => {
-      const pos = (p.positions || []).join(", ") || "Util";
-      return `
-        <div class="roster-row">
-          <strong>${escapeHtml(p.name)}</strong>
-          <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
-          <span class="role">${escapeHtml(p.role)}</span>
-          <span class="tag">${escapeHtml(pos)}</span>
-          <span class="muted">${p.born ? escapeHtml(p.born) : ""}</span>
-        </div>`;
-    })
-    .join("");
-}
-
-function rosterDiamond(players, svgId) {
-  const spots = [
-    { key: "CF", codes: ["CF"], left: "50%", top: "10%" },
-    { key: "LF", codes: ["LF"], left: "16%", top: "22%" },
-    { key: "RF", codes: ["RF"], left: "84%", top: "22%" },
-    { key: "SS", codes: ["SS"], left: "32%", top: "40%" },
-    { key: "2B", codes: ["2B"], left: "68%", top: "40%" },
-    { key: "P", codes: ["P"], left: "50%", top: "58%" },
-    { key: "C", codes: ["C"], left: "50%", top: "90%" },
-  ];
-  const placed = new Set();
-  const diamondSpots = spots
-    .map((spot) => {
-      const here = players.filter((p) => (p.positions || []).some((pos) => spot.codes.includes(pos)));
-      here.forEach((p) => placed.add(p.id));
-      if (!here.length && spot.key !== "P") {
-        return `<div class="spot empty" style="left:${spot.left};top:${spot.top}"><small>${spot.key}</small></div>`;
-      }
-      const names = here
-        .map((p) => `<b>${escapeHtml(p.name)}</b>`)
-        .join("");
-      return `<div class="spot" style="left:${spot.left};top:${spot.top}"><small>${spot.key}</small>${names || "<span class='muted'>—</span>"}</div>`;
-    })
-    .join("");
-  const bench = players.filter((p) => !placed.has(p.id));
-  const benchHtml = bench.map((p) => `<span class="chip">${escapeHtml(p.name)}</span>`).join("");
-  return `
-    <div class="diamond-card card">
-      <p class="kicker">Defense</p>
-      <div class="diamond">
-        <svg class="diamond-lines" viewBox="0 0 100 100" aria-hidden="true">
-          <defs>
-            <linearGradient id="${svgId}" x1="0" y1="0" x2="1" y2="1">
-              <stop stop-color="#c026ff"/><stop offset="1" stop-color="#22d3ee"/>
-            </linearGradient>
-          </defs>
-          <path d="M8 58 Q50 4 92 58" fill="none" stroke="rgba(34,211,238,0.28)" stroke-width="1.2"/>
-          <path d="M50 88 L82 56 L50 28 L18 56 Z" fill="rgba(192,38,255,0.08)" stroke="url(#${svgId})" stroke-width="1.4"/>
-          <circle cx="50" cy="58" r="5" fill="none" stroke="#22d3ee" stroke-width="1.1"/>
-          <path d="M18 56 L50 88 L82 56" fill="none" stroke="rgba(240,193,75,0.45)" stroke-width="0.8"/>
-        </svg>
-        ${diamondSpots}
-      </div>
-      <p class="muted" style="margin-top:0.6rem">Bench / unassigned</p>
-      <div class="chips">${benchHtml || '<span class="muted">Everybody has a spot</span>'}</div>
-    </div>`;
-}
-
-function renderRoster(roster, squad) {
-  squad = squad === "tournament" ? "tournament" : "league";
-  const players = roster.players.filter((p) => onSquad(p, squad));
-  const leagueOn = squad === "league";
-  const blurb = leagueOn
-    ? "Florida Challengers League · need 6 to take a night · cap 12"
-    : "PLW Saturday events · Aug 1 packet and onward";
-  return `
-    <div class="sched-bar">
-      <div>
-        <p class="kicker">${escapeHtml(roster.league)} · ${escapeHtml(roster.season)}</p>
-        <h1>Roster</h1>
-      </div>
-      <div class="squad-switch" role="group" aria-label="Roster type">
-        <button type="button" class="btn ${leagueOn ? "" : "ghost"}" data-squad="league">League</button>
-        <button type="button" class="btn ${leagueOn ? "ghost" : ""}" data-squad="tournament">Tournament</button>
-      </div>
-    </div>
-    <p class="lede">League nights and Saturday tournaments are different books. Co-managers: Tony Kurtanick and Brian Hannan.</p>
-    <p class="muted">${blurb}</p>
-    <div class="roster-layout">
-      ${rosterDiamond(players, "dg-roster")}
-      <div class="roster-list">${rosterRows(players)}</div>
-    </div>
-  `;
-}
-
-function bindRoster(roster) {
-  document.querySelectorAll("[data-squad]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const squad = btn.dataset.squad;
-      localStorage.setItem("wizardsRosterSquad", squad);
-      document.getElementById("app").innerHTML = renderRoster(roster, squad);
-      bindRoster(roster);
-      if (window.bootVisuals) window.bootVisuals();
-    });
-  });
 }
 
 function renderSchedule(schedule, avail, view, monthKey) {
@@ -296,11 +191,11 @@ function renderMedia() {
   `;
 }
 
-function renderGear(roster, jerseys) {
-  const savedId = localStorage.getItem("wizardsPlayerId") || roster.players[0].id;
+function renderGear(roster, jerseys, playerId) {
+  const savedId = playerId || "";
   const mine = (jerseys.requests || []).find((r) => r.playerId === savedId);
-  const options = roster.players
-    .map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`)
+  const options = [`<option value="">Who are you?</option>`]
+    .concat(roster.players.map((p) => `<option value="${p.id}" ${p.id === savedId ? "selected" : ""}>${escapeHtml(playerLabel(p))}</option>`))
     .join("");
   const sizes = ["S", "M", "L", "XL", "2XL", "3XL"]
     .map((s) => `<option ${mine && mine.size === s ? "selected" : ""}>${s}</option>`)
@@ -371,38 +266,41 @@ function renderGear(roster, jerseys) {
 
 function takenJerseyNumbers(roster, jerseys) {
   const seen = new Map();
-  for (const p of roster.players) {
-    if (p.number != null) seen.set(p.number, p.name);
-  }
-  for (const r of jerseys.requests || []) {
-    seen.set(r.number, r.playerName);
-  }
-  return [...seen.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([number, name]) => ({ number, name }));
+  for (const p of roster.players) if (p.number != null) seen.set(p.number, p.name);
+  for (const r of jerseys.requests || []) seen.set(r.number, r.playerName);
+  return [...seen.entries()].sort((a, b) => a[0] - b[0]).map(([number, name]) => ({ number, name }));
 }
-
-function bindGear(roster) {
+function bindGear(roster, skipAsk) {
   const form = document.getElementById("jersey-form");
   if (!form) return;
   const playerSelect = document.getElementById("jersey-player");
   const numberInput = document.getElementById("jersey-number");
+  const redraw = async (id) => {
+    rememberPlayerId(id);
+    const next = await api.get("/api/jerseys");
+    document.getElementById("app").innerHTML = renderGear(roster, next, id);
+    bindGear(roster, true);
+  };
+  if (!skipAsk) askWho(roster.players, (id) => redraw(id));
   playerSelect.addEventListener("change", () => {
-    localStorage.setItem("wizardsPlayerId", playerSelect.value);
+    if (!playerSelect.value) return;
+    rememberPlayerId(playerSelect.value);
     const player = roster.players.find((p) => p.id === playerSelect.value);
-    if (player && player.number != null && !numberInput.value) {
-      numberInput.value = player.number;
-    }
+    if (player && player.number != null && !numberInput.value) numberInput.value = player.number;
   });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
-    localStorage.setItem("wizardsPlayerId", data.playerId);
     const msg = document.getElementById("jersey-msg");
+    if (!data.playerId) {
+      msg.textContent = "Pick who you are first.";
+      return;
+    }
+    rememberPlayerId(data.playerId);
     try {
       const next = await api.send("/api/jerseys", "POST", data);
-      document.getElementById("app").innerHTML = renderGear(roster, next);
-      bindGear(roster);
+      document.getElementById("app").innerHTML = renderGear(roster, next, data.playerId);
+      bindGear(roster, true);
     } catch (err) {
       msg.textContent = err.message;
     }
@@ -416,17 +314,18 @@ function renderLeague() {
   return `
     <p class="kicker">Premier League WIFFLE®</p>
     <h1>League desk</h1>
-    <p class="lede">Florida Challengers League, Brooksville. Fall games count toward standings, player profiles, and the January 2027 weeknight invite.</p>
+    <p class="lede">Florida Challengers League is the practice and tryouts season. We are stacking a Wizards roster for the Real League, which starts January 2027.</p>
     <div class="grid-2" style="margin-top:1rem">
       <article class="card">
         <h2>Season facts</h2>
         <ul class="rules">
           <li>Location: private ranch, Brooksville, FL (address to registered teams)</li>
-          <li>Fall season through December 4, 2026</li>
-          <li>$250 per team for the year · ramp-up now, reset for the real league in February</li>
+          <li>Fall practice / tryouts through December 4, 2026</li>
+          <li>Real League starts January 2027 — this club is being built for that</li>
+          <li>$250 per team for the year</li>
           <li>Min 6 on the field, up to 12 on a roster</li>
           <li>21+ events · no kids · no pets · no spikes</li>
-          <li>Opening night stream: Aug 6, 7pm EST</li>
+          <li>Games stream on Twitch, sometimes YouTube or Instagram</li>
         </ul>
         <p>
           <a href="https://premierleaguewiffle.com/" target="_blank" rel="noopener">premierleaguewiffle.com</a>
@@ -448,11 +347,16 @@ function renderLeague() {
       </article>
     </div>
     <section class="card" style="margin-top:1rem">
-      <h2>Opening night replay</h2>
+      <h2>PLW live streaming</h2>
+      <p class="muted">Adam streams league nights and tournaments. Usually Twitch. Sometimes YouTube or Instagram — if one is dark, try the others.</p>
       <div class="twitch-wrap">
-        <iframe src="https://player.twitch.tv/?video=2834716125&${parents}&autoplay=false" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen title="PLW Opening Night Twitch replay"></iframe>
+        <iframe src="https://player.twitch.tv/?channel=premierwiffle&${parents}&autoplay=false" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen title="PLW live on Twitch"></iframe>
       </div>
-      <p style="margin-top:0.7rem"><a href="https://www.twitch.tv/videos/2834716125" target="_blank" rel="noopener">Open on Twitch</a> · <a href="https://www.twitch.tv/premierwiffle" target="_blank" rel="noopener">twitch.tv/premierwiffle</a></p>
+      <div class="actions">
+        <a class="btn" href="https://www.twitch.tv/premierwiffle" target="_blank" rel="noopener">Twitch</a>
+        <a class="btn ghost" href="https://www.youtube.com/c/premierleaguewiffle" target="_blank" rel="noopener">YouTube</a>
+        <a class="btn ghost" href="https://www.instagram.com/premierwiffle2/" target="_blank" rel="noopener">Instagram</a>
+      </div>
     </section>
   `;
 }

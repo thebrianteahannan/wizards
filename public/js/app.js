@@ -3,6 +3,8 @@ const routes = {
   "/roster": "roster",
   "/schedule": "schedule",
   "/availability": "availability",
+  "/tournament": "tournament",
+  "/practice": "practice",
   "/board": "board",
   "/media": "media",
   "/gear": "gear",
@@ -14,7 +16,7 @@ const routes = {
 };
 
 async function load() {
-  const hash = location.hash.replace(/^#/, "") || "/";
+  const hash = (location.hash.replace(/^#/, "") || "/").split("?")[0];
   const route = routes[hash] || "home";
   syncGates();
   document.querySelectorAll(".nav a").forEach((a) => {
@@ -23,20 +25,27 @@ async function load() {
   });
 
   const app = document.getElementById("app");
+  clearWhoModal();
   app.innerHTML = "<p class='muted'>Loading…</p>";
   try {
     if (route === "home") {
-      const [roster, schedule, avail, fees] = await Promise.all([
+      const [roster, schedule, avail, fees, tourneyAvail] = await Promise.all([
         api.get("/api/roster"),
         api.get("/api/schedule"),
-        isTeam() ? api.get("/api/availability") : Promise.resolve({}),
+        api.get("/api/availability?kind=league"),
         isTeam() ? api.get("/api/fees") : Promise.resolve({}),
+        api.get("/api/availability?kind=tournament"),
       ]);
-      app.innerHTML = renderHome(roster, schedule, avail, fees);
+      app.innerHTML = renderHome(roster, schedule, avail, fees, tourneyAvail);
+      bindRoster(roster, avail, tourneyAvail);
     } else if (route === "roster") {
-      const roster = await api.get("/api/roster");
-      app.innerHTML = renderRoster(roster, localStorage.getItem("wizardsRosterSquad"));
-      bindRoster(roster);
+      const [roster, leagueAvail, tourneyAvail] = await Promise.all([
+        api.get("/api/roster"),
+        api.get("/api/availability?kind=league"),
+        api.get("/api/availability?kind=tournament"),
+      ]);
+      app.innerHTML = renderRoster(roster, localStorage.getItem("wizardsRosterSquad"), leagueAvail, tourneyAvail);
+      bindRoster(roster, leagueAvail, tourneyAvail);
     } else if (route === "schedule") {
       const [schedule, avail] = await Promise.all([
         api.get("/api/schedule"),
@@ -44,14 +53,15 @@ async function load() {
       ]);
       app.innerHTML = renderSchedule(schedule, avail);
       bindSchedule(schedule, avail);
-    } else if (route === "availability") {
+    } else if (route === "availability" || route === "tournament" || route === "practice") {
       if (!isTeam()) {
         app.innerHTML = renderLock("team");
         bindPageLock("team");
       } else {
-        const [roster, avail] = await Promise.all([api.get("/api/roster"), api.get("/api/availability")]);
-        app.innerHTML = await renderAvailability(roster, avail);
-        bindAvailability(roster);
+        const kind = route === "availability" ? "league" : route;
+        const [roster, avail] = await Promise.all([api.get("/api/roster"), api.get("/api/availability?kind=" + kind)]);
+        app.innerHTML = await renderAvailability(roster, avail, "", kind);
+        bindAvailability(roster, false, kind);
       }
     } else if (route === "board") {
       if (!isTeam()) {
@@ -75,6 +85,7 @@ async function load() {
       } else {
         const [roster, fees] = await Promise.all([api.get("/api/roster"), api.get("/api/fees")]);
         app.innerHTML = renderDues(roster, fees);
+        bindDues(roster, fees);
       }
     } else if (route === "admin") {
       if (!isAdmin()) {
@@ -95,7 +106,9 @@ async function load() {
         app.innerHTML = renderLock("team");
         bindPageLock("team");
       } else {
-        app.innerHTML = renderRecruits(await api.get("/api/recruits"));
+        const rec = await api.get("/api/recruits");
+        app.innerHTML = renderRecruits(rec);
+        bindRecruits(rec);
       }
     }
   } catch (err) {
