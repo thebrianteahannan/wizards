@@ -20,19 +20,26 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
     return `<span class="spark" title="${label}"><i style="height:${pct}%"></i></span>`;
   }).join("");
   const team = isTeam();
-  const hudNight = team && best ? `${best.yes}/6 · ${cap(best.day)}` : "Wizards";
+  const hudNight = best ? `${best.yes}/6 · ${cap(best.day)}` : "0/6";
   const actions = team
-    ? `<a class="btn" href="#/availability">Set your nights</a><a class="btn ghost" href="#/board">Announcements</a>`
-    : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a>`;
+    ? `<a class="btn" href="#/availability">Set your nights</a><a class="btn ghost" href="#/board">Announcements</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`
+    : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`;
   const nightCard = team
     ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>League night</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
-    : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>The league</h3><p class="muted">Fall tryouts. Real League in January.</p></a>`;
+    : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>PLW Info</h3><p class="muted">Fall tryouts. Real League in January.</p></a>`;
   const duesCard = team
     ? `<a class="card feature" href="#/dues"><span class="icon">$</span><h3>Dues</h3><p class="muted">${fees && fees.model === "flat" ? money(fees.flatAmount) + " flat for the year" : "$250 team bill"}</p></a>`
-    : `<a class="card feature" href="#/gear"><span class="icon">$</span><h3>Gear</h3><p class="muted">Purple kits. Turf shoes. Request a jersey.</p></a>`;
+    : `<a class="card feature" href="#/join"><span class="icon">+</span><h3>Join</h3><p class="muted">Tryouts this fall. Put your name in.</p></a>`;
+  const jerseyCard = team
+    ? `<a class="card feature" href="#/gear">
+        <span class="icon">✦</span>
+        <h3>Jersey request</h3>
+        <p class="muted">Number, size, purple kit.</p>
+      </a>`
+    : "";
   const duesStat = team
     ? `<a class="card stat" href="#/dues"><b>${fees ? money(fees.model === "flat" ? fees.flatAmount : fees.teamTotal) : "$250"}</b>${fees && fees.model === "flat" ? "flat dues this year" : "team fee for the year"}</a>`
-    : `<article class="card stat"><b>$250</b>team fee for the year</article>`;
+    : "";
   const pulse = team
     ? `<article class="card"><p class="kicker">Availability pulse</p><h2>${best && best.yes >= 6 ? "We can field a night" : "Still hunting a night"}</h2><p>${best ? `<span class="${best.yes >= 6 ? "ok" : "warn"}">${best.yes} yes / ${best.maybe} maybe</span> on ${cap(best.day)} ${best.window}` : "Nobody has filled nights yet. Grab League Night and tap your week."}</p><p class="muted">Fall league is flexible weeknights and weekends until the lights are fully in.</p></article>`
     : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League Night, announcements, and dues open with the team password in the header.</p></article>`;
@@ -43,7 +50,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
         <p class="kicker">Florida Challengers League · Fall 2026</p>
         <h1>Six on.<br /><span class="grad-text">Lights out.</span></h1>
         <p class="lede">This fall is practice and tryouts. We are building the Wizards for PLW’s Real League, which starts January 2027.</p>
-        <p class="muted">Co-managers Tony Kurtanick and Brian Hannan. ${roster.players.length} on the book. Need <strong>6 players the same night</strong> to take a league game.</p>
+        <p class="muted">Co-managers Tony Kurtanick and Brian Hannan. ${roster.players.length} on the book. Need <strong>6 players the same night</strong> to take a league game. Check out our roster below.</p>
         <div class="actions">
           ${actions}
         </div>
@@ -57,10 +64,10 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
           <img src="/media/jersey-mockup.jpg" alt="Wizards of Wiff pinstripe jersey mockup" />
           <figcaption>Option 5: Pinstripe Wizard Alternate — purple, gold, and smoke.</figcaption>
         </figure>
-        <div class="hud hud-br">
+        <a class="hud hud-br" href="#/availability${next && next.date ? "?date=" + encodeURIComponent(next.date) : ""}">
           <small>Next on deck</small>
           <b>${next ? escapeHtml(next.title.replace(" — ", " · ").slice(0, 28)) : "TBD"}</b>
-        </div>
+        </a>
       </div>
     </section>
     <section class="feature-rail">
@@ -70,11 +77,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
         <h3>Schedule</h3>
         <p class="muted">${next ? fmtDate(next.date) + " · " + escapeHtml(next.when) : "Calendar loading"}</p>
       </a>
-      <a class="card feature" href="#/gear">
-        <span class="icon">✦</span>
-        <h3>Jersey request</h3>
-        <p class="muted">Number, size, purple kit.</p>
-      </a>
+      ${jerseyCard}
       ${duesCard}
       <a class="card feature" href="#/roster">
         <span class="icon">☰</span>
@@ -87,7 +90,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
         <p class="muted">Kits, K-zone, Brooksville film.</p>
       </a>
     </section>
-    <section class="grid-3" style="margin-top:1rem">
+    <section class="${team ? "grid-3" : "grid-2"}" style="margin-top:1rem">
       <article class="card stat"><b>${roster.players.length}</b>rostered Wizards</article>
       <article class="card stat"><b>6</b>needed for league night</article>
       ${duesStat}
@@ -115,7 +118,8 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
         <h2>Practice league now. Real League in January.</h2>
         <p>Florida Challengers League through December 4 is reps and tryouts — chemistry, nights we can field six, and who belongs on this club. The Real League starts January 2027. Everything we do in Brooksville this fall is to have a Wizards team ready for that.</p>
         <div class="actions">
-          <a class="btn ghost" href="#/league">Rules &amp; stream</a>
+          <a class="btn ghost" href="#/league">Watch stream</a>
+          ${team ? `<a class="btn ghost" href="#/strategy">Strategy</a>` : ""}
           <a class="btn ghost" href="#/media">Gallery</a>
         </div>
       </article>
@@ -313,39 +317,25 @@ function renderLeague() {
     .join("&");
   return `
     <p class="kicker">Premier League WIFFLE®</p>
-    <h1>League desk</h1>
+    <h1>PLW Info</h1>
     <p class="lede">Florida Challengers League is the practice and tryouts season. We are stacking a Wizards roster for the Real League, which starts January 2027.</p>
-    <div class="grid-2" style="margin-top:1rem">
-      <article class="card">
-        <h2>Season facts</h2>
-        <ul class="rules">
-          <li>Location: private ranch, Brooksville, FL (address to registered teams)</li>
-          <li>Fall practice / tryouts through December 4, 2026</li>
-          <li>Real League starts January 2027 — this club is being built for that</li>
-          <li>$250 per team for the year</li>
-          <li>Min 6 on the field, up to 12 on a roster</li>
-          <li>21+ events · no kids · no pets · no spikes</li>
-          <li>Games stream on Twitch, sometimes YouTube or Instagram</li>
-        </ul>
-        <p>
-          <a href="https://premierleaguewiffle.com/" target="_blank" rel="noopener">premierleaguewiffle.com</a>
-          · <a href="https://premierleaguewiffle.com/basic-rules/" target="_blank" rel="noopener">Basic rules</a>
-          · <a href="https://premierleaguewiffle.com/player-code-of-conduct/" target="_blank" rel="noopener">Code of conduct</a>
-        </p>
-      </article>
-      <article class="card">
-        <h2>Rules that decide games</h2>
-        <ul class="rules">
-          <li>Every at-bat starts 0–1. Six innings.</li>
-          <li>Called strikes must read ≤55 mph and hit the K-zone in the air.</li>
-          <li>Walk 2 batters → pitcher is done (last eligible pitcher has no walk cap).</li>
-          <li>No gloves. Force outs: ball into backstop / K-zone / batter in the air within 5 seconds.</li>
-          <li>Only official yellow Wiffle bats. Legal tape only.</li>
-          <li>Motto: Play Hard. Have Fun. Respect All.</li>
-        </ul>
-        <p><a href="/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf" target="_blank" rel="noopener">August 1 tournament packet (PDF)</a></p>
-      </article>
-    </div>
+    <section class="card" style="margin-top:1rem">
+      <h2>Season facts</h2>
+      <ul class="rules">
+        <li>Location: private ranch, Brooksville, FL (address to registered teams)</li>
+        <li>Fall practice / tryouts through December 4, 2026</li>
+        <li>Real League starts January 2027 — this club is being built for that</li>
+        <li>$250 per team for the year</li>
+        <li>Min 6 on the field, up to 12 on a roster</li>
+        <li>21+ events · no kids · no pets · no spikes</li>
+        <li>Games stream on Twitch, sometimes YouTube or Instagram</li>
+      </ul>
+      <p>
+        <a href="https://premierleaguewiffle.com/" target="_blank" rel="noopener">premierleaguewiffle.com</a>
+        · <a href="https://premierleaguewiffle.com/basic-rules/" target="_blank" rel="noopener">Basic rules</a>
+        · <a href="https://premierleaguewiffle.com/player-code-of-conduct/" target="_blank" rel="noopener">Code of conduct</a>
+      </p>
+    </section>
     <section class="card" style="margin-top:1rem">
       <h2>PLW live streaming</h2>
       <p class="muted">Adam streams league nights and tournaments. Usually Twitch. Sometimes YouTube or Instagram — if one is dark, try the others.</p>
@@ -357,6 +347,26 @@ function renderLeague() {
         <a class="btn ghost" href="https://www.youtube.com/c/premierleaguewiffle" target="_blank" rel="noopener">YouTube</a>
         <a class="btn ghost" href="https://www.instagram.com/premierwiffle2/" target="_blank" rel="noopener">Instagram</a>
       </div>
+    </section>
+  `;
+}
+
+function renderStrategy() {
+  return `
+    <p class="kicker">Team only</p>
+    <h1>Strategy</h1>
+    <p class="lede">How these games are actually decided. Keep it in the book so we play the same way.</p>
+    <section class="card" style="max-width:40rem">
+      <h2>Rules that decide games</h2>
+      <ul class="rules">
+        <li>Every at-bat starts 0–1. Six innings.</li>
+        <li>Called strikes must read ≤55 mph and hit the K-zone in the air.</li>
+        <li>Walk 2 batters → pitcher is done (last eligible pitcher has no walk cap).</li>
+        <li>No gloves. Force outs: ball into backstop / K-zone / batter in the air within 5 seconds.</li>
+        <li>Only official yellow Wiffle bats. Legal tape only.</li>
+        <li>Motto: Play Hard. Have Fun. Respect All.</li>
+      </ul>
+      <p><a href="/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf" target="_blank" rel="noopener">August 1 tournament packet (PDF)</a></p>
     </section>
   `;
 }

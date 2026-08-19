@@ -1,7 +1,7 @@
 const AVAIL_META = {
   league: {
     kind: "league",
-    title: "League night",
+    title: "Upcoming events",
     lede: "Mark the windows Adam sent. Green at NEED yes.",
     from: "From Adam",
     board: "Windows on the board",
@@ -172,19 +172,91 @@ async function renderAvailability(roster, avail, playerId, kind) {
   `;
 }
 
-function bindAvailability(roster, skipAsk, kind) {
+function firstWindowOffer(avail) {
+  const today = new Date().toISOString().slice(0, 10);
+  return [...(avail.offers || [])]
+    .filter((o) => o.date && o.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+}
+
+function askFirstWindow(playerId, offer, avail, kind, onDone) {
+  clearWhoModal();
+  const day = offerKey(offer, kind);
+  const wins = windowsForOffer(offer, (avail && avail.windows) || []);
+  const when = new Date(offer.date + "T12:00:00");
+  const label = Number.isNaN(when.getTime())
+    ? cap(offer.day)
+    : when.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const winHtml = wins
+    .map((w) => `<label><input type="checkbox" name="win" value="${escapeHtml(w.id)}" checked /> ${escapeHtml(w.hint)}</label>`)
+    .join("");
+  const wrap = document.createElement("div");
+  wrap.id = "who-modal";
+  wrap.className = "who-modal";
+  wrap.innerHTML = `
+    <form class="card who-card">
+      <p class="kicker">Next window · need 6 ASAP</p>
+      <h2>Can you play ${escapeHtml(label)}?</h2>
+      <p class="muted">This is the night we need a roster for first. ${escapeHtml(offer.note || "")} You can mark other dates after this.</p>
+      <div class="seg">
+        <label><input type="radio" name="st" value="yes" required /> Yes</label>
+        <label><input type="radio" name="st" value="maybe" /> Maybe</label>
+        <label><input type="radio" name="st" value="no" /> No</label>
+      </div>
+      ${winHtml ? `<div class="windows" style="margin-top:0.65rem">${winHtml}</div>` : ""}
+      <p class="muted first-win-msg"></p>
+      <button class="btn" type="submit">Save this night</button>
+    </form>`;
+  document.body.appendChild(wrap);
+  const form = wrap.querySelector("form");
+  form.querySelectorAll('input[name="st"]').forEach((inp) => {
+    inp.addEventListener("change", () => {
+      form.querySelectorAll(".seg label").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
+    });
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = String(new FormData(form).get("st") || "no");
+    let windows = [...form.querySelectorAll('input[name="win"]:checked')].map((i) => i.value);
+    if (status !== "no" && windows.length === 0) {
+      windows = [...form.querySelectorAll('input[name="win"]')].map((i) => i.value);
+    }
+    const msg = form.querySelector(".first-win-msg");
+    try {
+      await api.send("/api/availability/" + playerId, "PUT", {
+        kind,
+        days: { [day]: { status, windows: status === "no" ? [] : windows } },
+      });
+      wrap.remove();
+      onDone(offer.date);
+    } catch (err) {
+      if (msg) msg.textContent = err.message;
+    }
+  });
+}
+
+function bindAvailability(roster, skipAsk, kind, avail) {
   const page = availPage(kind);
   const form = document.getElementById("avail-form");
   if (!form) return;
   const select = document.getElementById("player-id");
-  const redraw = async (id, skip) => {
+  const redraw = async (id, skip, focusDate) => {
     rememberPlayerId(id);
     const [r, a] = await Promise.all([api.get("/api/roster"), api.get(availApi(page.kind))]);
     document.getElementById("app").innerHTML = await renderAvailability(r, a, id, page.kind);
-    bindAvailability(r, skip, page.kind);
+    bindAvailability(r, skip, page.kind, a);
+    const card = focusDate && document.querySelector(`article.day[data-date="${focusDate}"]`);
+    if (card) {
+      card.classList.add("focus");
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
   if (!skipAsk) {
-    askWho(roster.players, (id) => redraw(id, true));
+    askWho(roster.players, (id) => {
+      const first = page.kind === "league" ? firstWindowOffer(avail || {}) : null;
+      if (first) askFirstWindow(id, first, avail, page.kind, (focusDate) => redraw(id, true, focusDate));
+      else redraw(id, true);
+    });
   }
   select.addEventListener("change", async () => {
     if (!select.value) return;
@@ -212,7 +284,7 @@ function bindAvailability(roster, skipAsk, kind) {
     try {
       const avail = await api.send("/api/availability/" + playerId, "PUT", { days, kind: page.kind });
       document.getElementById("app").innerHTML = await renderAvailability(roster, avail, playerId, page.kind);
-      bindAvailability(roster, true, page.kind);
+      bindAvailability(roster, true, page.kind, avail);
       document.getElementById("avail-msg").textContent = "Saved.";
     } catch (err) {
       msg.textContent = err.message;
@@ -228,7 +300,7 @@ function bindAvailability(roster, skipAsk, kind) {
           window: btn.dataset.window,
         });
         document.getElementById("app").innerHTML = await renderAvailability(roster, avail, select.value, page.kind);
-        bindAvailability(roster, true, page.kind);
+        bindAvailability(roster, true, page.kind, avail);
       } catch (err) {
         alert(err.message);
       }
@@ -239,7 +311,7 @@ function bindAvailability(roster, skipAsk, kind) {
     clear.addEventListener("click", async () => {
       const avail = await api.send("/api/lock-night", "POST", { playerId: select.value, kind: page.kind, clear: true });
       document.getElementById("app").innerHTML = await renderAvailability(roster, avail, select.value, page.kind);
-      bindAvailability(roster, true, page.kind);
+      bindAvailability(roster, true, page.kind, avail);
     });
   }
   const date = new URLSearchParams((location.hash.split("?")[1] || "")).get("date");

@@ -29,7 +29,7 @@
   "players": {
     "brian-hannan": {
       "name": "Brian Hannan",
-      "updatedAt": "2026-08-18T22:47:33.021Z",
+      "updatedAt": "2026-08-19T15:43:50.150Z",
       "days": {
         "monday": {
           "status": "no",
@@ -72,10 +72,43 @@
   },
   "lockedNight": null,
   "offers": [
-    { "date": "2026-08-22", "day": "saturday", "note": "1pm or 5pm · series before the tournament", "times": ["1pm", "5pm"] },
-    { "date": "2026-08-23", "day": "sunday", "note": "1pm or 5pm · series before the tournament", "times": ["1pm", "5pm"] },
-    { "date": "2026-08-24", "day": "monday", "note": "vs Blitz" },
-    { "date": "2026-08-25", "day": "tuesday", "note": "vs Dem Bois" },
-    { "date": "2026-09-04", "day": "friday", "note": "vs Flamingos · 6:00 / 6:50 / 7:40 PM", "times": ["6:00 PM", "6:50 PM", "7:40 PM"] }
+    {
+      "date": "2026-08-22",
+      "day": "saturday",
+      "note": "1pm or 5pm · series before the tournament",
+      "times": [
+        "1pm",
+        "5pm"
+      ]
+    },
+    {
+      "date": "2026-08-23",
+      "day": "sunday",
+      "note": "1pm or 5pm · series before the tournament",
+      "times": [
+        "1pm",
+        "5pm"
+      ]
+    },
+    {
+      "date": "2026-08-24",
+      "day": "monday",
+      "note": "vs Blitz"
+    },
+    {
+      "date": "2026-08-25",
+      "day": "tuesday",
+      "note": "vs Dem Bois"
+    },
+    {
+      "date": "2026-09-04",
+      "day": "friday",
+      "note": "vs Flamingos · 6:00 / 6:50 / 7:40 PM",
+      "times": [
+        "6:00 PM",
+        "6:50 PM",
+        "7:40 PM"
+      ]
+    }
   ]
 }

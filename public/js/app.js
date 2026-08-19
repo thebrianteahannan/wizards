@@ -11,6 +11,7 @@ const routes = {
   "/dues": "dues",
   "/admin": "admin",
   "/league": "league",
+  "/strategy": "strategy",
   "/join": "join",
   "/recruits": "recruits",
 };
@@ -61,7 +62,7 @@ async function load() {
         const kind = route === "availability" ? "league" : route;
         const [roster, avail] = await Promise.all([api.get("/api/roster"), api.get("/api/availability?kind=" + kind)]);
         app.innerHTML = await renderAvailability(roster, avail, "", kind);
-        bindAvailability(roster, false, kind);
+        bindAvailability(roster, false, kind, avail);
       }
     } else if (route === "board") {
       if (!isTeam()) {
@@ -75,9 +76,14 @@ async function load() {
     } else if (route === "media") {
       app.innerHTML = renderMedia();
     } else if (route === "gear") {
-      const [roster, jerseys] = await Promise.all([api.get("/api/roster"), api.get("/api/jerseys")]);
-      app.innerHTML = renderGear(roster, jerseys);
-      bindGear(roster);
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        const [roster, jerseys] = await Promise.all([api.get("/api/roster"), api.get("/api/jerseys")]);
+        app.innerHTML = renderGear(roster, jerseys);
+        bindGear(roster);
+      }
     } else if (route === "dues") {
       if (!isTeam()) {
         app.innerHTML = renderLock("team");
@@ -95,6 +101,13 @@ async function load() {
         const [roster, fees] = await Promise.all([api.get("/api/roster"), api.get("/api/fees")]);
         app.innerHTML = renderAdmin(roster, fees);
         bindAdmin(roster);
+      }
+    } else if (route === "strategy") {
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        app.innerHTML = renderStrategy();
       }
     } else if (route === "league") {
       app.innerHTML = renderLeague();

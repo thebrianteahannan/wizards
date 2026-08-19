@@ -32,6 +32,8 @@ function syncGates() {
   const form = document.getElementById("team-gate");
   if (leave) leave.hidden = !isTeam();
   if (form) form.hidden = isTeam();
+  const join = document.getElementById("nav-join");
+  if (join) join.textContent = isTeam() ? "Recruit" : "Join";
 }
 
 function renderLock(kind) {
@@ -102,7 +104,7 @@ function bindHeaderGate() {
     leave.addEventListener("click", () => {
       setTeam(false);
       syncGates();
-      if (/availability|tournament|practice|board|dues|admin|recruits/.test(location.hash)) location.hash = "#/";
+      if (/availability|tournament|practice|board|dues|admin|recruits|gear|strategy/.test(location.hash)) location.hash = "#/";
       else load();
     });
   }

@@ -63,15 +63,22 @@ function recruitCoreFields(r, opts) {
 }
 
 function renderJoin() {
+  const team = isTeam();
   return `
-    <p class="kicker">Tryouts</p>
-    <h1>Join the Wizards</h1>
-    <p class="lede">This fall is practice and tryouts. We are building a Wizards club for the Real League in January 2027. Co-managers review every form.</p>
+    <p class="kicker">${team ? "Team" : "Tryouts"}</p>
+    <h1>${team ? "Recruit a Wizard" : "Join the Wizards"}</h1>
+    <p class="lede">${team
+      ? "Know someone who should try out? Put them in the book. They show up on Recruits so you can add notes later."
+      : "This fall is practice and tryouts. We are building a Wizards club for the Real League in January 2027. Co-managers review every form."}</p>
     <section class="card" style="max-width:40rem">
       <form id="join-form">
         ${recruitCoreFields({}, { phoneRequired: true })}
+        ${team ? `<div class="form-row">
+            <label>Notes (optional)</label>
+            <textarea name="notes" rows="3" maxlength="800" placeholder="How you know them, when they can play, anything else"></textarea>
+          </div>` : ""}
         <div class="actions">
-          <button class="btn" type="submit">Send it</button>
+          <button class="btn" type="submit">${team ? "Add them" : "Send it"}</button>
         </div>
         <p id="join-msg" class="muted"></p>
       </form>
@@ -112,7 +119,7 @@ function renderRecruits(data, openId) {
   return `
     <p class="kicker">Team only</p>
     <h1>Recruits</h1>
-    <p class="lede">People who filled out Join the team. Add phone, email, or notes whenever you get them. ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}</p>
+    <p class="lede">People who joined or that a Wizard recruited. Add phone, email, or notes whenever you get them. ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}</p>
     <div class="timeline" style="margin-top:1rem">${rows || '<p class="muted">The inbox is empty.</p>'}</div>
   `;
 }
@@ -127,7 +134,7 @@ function bindJoin() {
     try {
       await api.send("/api/recruits", "POST", body);
       form.reset();
-      msg.textContent = "Got it. A Wizard will be in touch.";
+      msg.textContent = isTeam() ? "They're on Recruits." : "Got it. A Wizard will be in touch.";
     } catch (err) {
       msg.textContent = err.message;
     }
