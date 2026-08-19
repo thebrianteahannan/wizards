@@ -168,7 +168,7 @@ function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, head
     : "PLW Saturday events · Aug 1 packet and onward";
   const title = heading === "h2" ? "h2" : "h1";
   return `
-    <div id="roster-embed" data-svg="${escapeHtml(svgId || "dg-roster")}" data-squad="${escapeHtml(squad)}">
+    <div id="roster-embed" data-svg="${escapeHtml(svgId || "dg-roster")}" data-book="${escapeHtml(squad)}">
       <div class="sched-bar">
         <div>
           <p class="kicker">${escapeHtml(roster.league)} · ${escapeHtml(roster.season)}</p>
@@ -206,13 +206,13 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
     bindRoster(roster, leagueAvail, tourneyAvail);
     if (window.bootVisuals) window.bootVisuals();
   };
-  document.querySelectorAll("[data-squad]").forEach((btn) => {
+  document.querySelectorAll("button[data-squad]").forEach((btn) => {
     btn.addEventListener("click", () => redraw(btn.dataset.squad));
   });
   document.querySelectorAll("[data-pitcher]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const box = document.getElementById("roster-embed");
-      const squad = (box && box.dataset.squad) === "tournament" ? "tournament" : "league";
+      const squad = (box && box.dataset.book) === "tournament" ? "tournament" : "league";
       localStorage.setItem(pitcherKey(squad), btn.dataset.pitcher);
       redraw(squad);
     });
