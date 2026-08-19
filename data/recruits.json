@@ -1,0 +1,33 @@
+{
+  "recruits": [
+    {
+      "id": "r1755606720000",
+      "firstName": "David",
+      "lastName": "Rhoades",
+      "number": 38,
+      "primary": "Util",
+      "secondary": "CF",
+      "experience": "Adult softball, high school baseball",
+      "why": "",
+      "phone": "352-616-8110",
+      "email": "david38rhoades@gmail.com",
+      "notes": "Age 44. 5'8\", 175 lbs. From Baltimore, Maryland. Lives in Brooksville. Primary 3B, secondary outfield. Bats R, throws R. Available Monday–Friday 6–10 PM. Reliable transportation. Willing to join any team with an opening. Played baseball in high school and a church summer softball league last year. Says he’s available for all listed times. Submitted August 19, 2026 at 11:12 AM.",
+      "createdAt": "2026-08-19T15:12:00.000Z"
+    },
+    {
+      "id": "r1787151724448",
+      "firstName": "Micah",
+      "lastName": "Earwood",
+      "number": 36,
+      "primary": "P",
+      "secondary": "Util",
+      "experience": "12",
+      "why": "Because you are the most fun team it seems like, and can win!",
+      "createdAt": "2026-08-19T15:02:04.448Z",
+      "phone": "",
+      "email": "",
+      "notes": "Contacted him on FB on Aug 18th. Haven't heard back from him yet. He seems like a really good baseball player in Lakeland. Solid recruit.",
+      "updatedAt": "2026-08-19T15:07:57.001Z"
+    }
+  ]
+}
