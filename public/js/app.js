@@ -51,12 +51,15 @@ async function load() {
       app.innerHTML = renderRoster(roster, localStorage.getItem("wizardsRosterSquad"), leagueAvail, tourneyAvail);
       bindRoster(roster, leagueAvail, tourneyAvail);
     } else if (route === "schedule") {
-      const [schedule, avail] = await Promise.all([
+      const [schedule, leagueAvail, tourneyAvail, practiceAvail] = await Promise.all([
         api.get("/api/schedule"),
-        isTeam() ? api.get("/api/availability") : Promise.resolve({}),
+        api.get("/api/availability?kind=league"),
+        api.get("/api/availability?kind=tournament"),
+        api.get("/api/availability?kind=practice"),
       ]);
-      app.innerHTML = renderSchedule(schedule, avail);
-      bindSchedule(schedule, avail);
+      const packs = { league: leagueAvail, tournament: tourneyAvail, practice: practiceAvail };
+      app.innerHTML = renderSchedule(schedule, leagueAvail, null, null, packs);
+      bindSchedule(schedule, leagueAvail, packs);
     } else if (route === "availability" || route === "tournament" || route === "practice") {
       if (!isTeam()) {
         app.innerHTML = renderLock("team");

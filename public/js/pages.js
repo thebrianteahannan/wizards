@@ -127,7 +127,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
   `;
 }
 
-function renderSchedule(schedule, avail, view, monthKey) {
+function renderSchedule(schedule, avail, view, monthKey, packs) {
   view = view || localStorage.getItem("wizardsSchedView") || "calendar";
   const events = schedule.events || [];
   const first = events[0] && events[0].date ? events[0].date.slice(0, 7) : "2026-08";
@@ -157,7 +157,7 @@ function renderSchedule(schedule, avail, view, monthKey) {
     </div>
     <p class="lede">${isTeam() ? `Tournaments and league dates. Recurring weeknight is chosen on <a href="#/availability">League</a> once six Wizards overlap.` : "Tournaments and league dates on the PLW calendar."}</p>
     ${isTeam() ? lock : ""}
-    ${view === "calendar" ? renderCalendarMonth(events, monthKey) : `<div class="timeline" style="margin-top:1rem">${list}</div>`}
+    ${view === "calendar" ? renderCalendarMonth(events, monthKey, packs) : `<div class="timeline" style="margin-top:1rem">${list}</div>`}
   `;
 }
 
