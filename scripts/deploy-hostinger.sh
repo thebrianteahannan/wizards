@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Package the Wizards hub for Hostinger Node.js web-app hosting.
 #
-#   npm run deploy              zip without data/ (safer updates)
-#   npm run deploy:fresh        zip including data/ (first upload)
+#   npm run deploy              zip WITH data/ (Hostinger replaces the app folder)
+#   npm run deploy:code         zip without data/ (site 500s unless you restore data/)
+#   npm run deploy:fresh        same as deploy — includes data/
 #   ./scripts/deploy-hostinger.sh --upload   also FTP the zip if env is set
 #
 # Optional FTP (do not commit these):
@@ -17,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$ROOT/dist"
 STAGING="$DIST/hostinger"
 ZIP="$DIST/wizards-hostinger.zip"
-INCLUDE_DATA=0
+INCLUDE_DATA=1
 UPLOAD=0
 
 for arg in "$@"; do
@@ -39,15 +40,15 @@ done
 rm -rf "$STAGING" "$ZIP"
 mkdir -p "$STAGING/public"
 
-cp "$ROOT/server.js" "$ROOT/package.json" "$ROOT/package-lock.json" "$STAGING/"
+cp "$ROOT/server.js" "$ROOT/store.js" "$ROOT/package.json" "$ROOT/package-lock.json" "$STAGING/"
 rsync -a --exclude '.DS_Store' "$ROOT/public/" "$STAGING/public/"
 
 if [[ "$INCLUDE_DATA" -eq 1 ]]; then
   mkdir -p "$STAGING/data"
   rsync -a --exclude '.DS_Store' "$ROOT/data/" "$STAGING/data/"
 else
-  echo "Skipping data/ so a live board, dues, and availability stay intact."
-  echo "First time on Hostinger? Run: npm run deploy:fresh"
+  echo "WARNING: Skipping data/. Hostinger replaces the app folder, so a zip"
+  echo "without data/ deletes live JSON and /api/roster will 500."
 fi
 
 (

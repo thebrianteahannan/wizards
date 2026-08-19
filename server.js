@@ -1,10 +1,9 @@
-const fs = require("fs");
 const path = require("path");
 const express = require("express");
+const { init, readJson, writeJson, status } = require("./store");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA = path.join(__dirname, "data");
 
 app.use(express.json({ limit: "200kb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -13,30 +12,23 @@ const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
 const WINDOWS = ["afternoon", "evening", "night"];
 const STATUSES = ["yes", "maybe", "no"];
 
-function readJson(file) {
-  return JSON.parse(fs.readFileSync(path.join(DATA, file), "utf8"));
-}
-
-function writeJson(file, value) {
-  const dest = path.join(DATA, file);
-  const tmp = dest + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, dest);
-}
-
-function rosterById() {
-  const roster = readJson("roster.json");
+async function rosterById() {
+  const roster = await readJson("roster.json");
   const map = {};
   for (const p of roster.players) map[p.id] = p;
   return { roster, map };
 }
 
-app.get("/api/roster", (_req, res) => {
-  res.json(readJson("roster.json"));
+app.get("/api/roster", async (_req, res) => {
+  res.json(await readJson("roster.json"));
 });
 
-app.get("/api/schedule", (_req, res) => {
-  res.json(readJson("schedule.json"));
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true, ...status() });
+});
+
+app.get("/api/schedule", async (_req, res) => {
+  res.json(await readJson("schedule.json"));
 });
 
 const AVAIL_FILES = {
@@ -58,9 +50,9 @@ function isWindowId(w) {
   return WINDOWS.includes(w) || /^t-[a-z0-9-]{1,32}$/.test(String(w || ""));
 }
 
-function readActivity() {
+async function readActivity() {
   try {
-    const log = readJson("activity.json");
+    const log = await readJson("activity.json");
     return Array.isArray(log.entries) ? log : { entries: [] };
   } catch (_) {
     return { entries: [] };
@@ -88,14 +80,14 @@ function stampAvail(entry) {
   return wins.length ? status + " · " + wins.join(", ") : status;
 }
 
-function logAvailability(player, kind, prevDays, nextDays, keys) {
+async function logAvailability(player, kind, prevDays, nextDays, keys) {
   const lines = [];
   for (const key of keys) {
     if (stampAvail(prevDays[key]) === stampAvail(nextDays[key])) continue;
     lines.push(capDay(key) + ": " + stampAvail(prevDays[key]) + " → " + stampAvail(nextDays[key]));
   }
   if (!lines.length) return;
-  const log = readActivity();
+  const log = await readActivity();
   log.entries.unshift({
     id: "a" + Date.now(),
     at: new Date().toISOString(),
@@ -106,19 +98,19 @@ function logAvailability(player, kind, prevDays, nextDays, keys) {
     lines,
   });
   log.entries = log.entries.slice(0, 400);
-  writeJson("activity.json", log);
+  await writeJson("activity.json", log);
 }
 
-app.get("/api/availability", (req, res) => {
-  res.json(readJson(AVAIL_FILES[availKind(req)]));
+app.get("/api/availability", async (req, res) => {
+  res.json(await readJson(AVAIL_FILES[availKind(req)]));
 });
 
-app.get("/api/activity", (_req, res) => {
-  res.json(readActivity());
+app.get("/api/activity", async (_req, res) => {
+  res.json(await readActivity());
 });
 
-app.put("/api/availability/:playerId", (req, res) => {
-  const { map } = rosterById();
+app.put("/api/availability/:playerId", async (req, res) => {
+  const { map } = await rosterById();
   const player = map[req.params.playerId];
   if (!player) return res.status(404).json({ error: "Unknown player" });
 
@@ -129,7 +121,7 @@ app.put("/api/availability/:playerId", (req, res) => {
 
   const kind = availKind(req);
   const file = AVAIL_FILES[kind];
-  const avail = readJson(file);
+  const avail = await readJson(file);
   const prev = ((avail.players[player.id] || {}).days) || {};
   const clean = { ...prev };
   const submitted = [];
@@ -159,15 +151,15 @@ app.put("/api/availability/:playerId", (req, res) => {
     updatedAt: new Date().toISOString(),
     days: clean,
   };
-  writeJson(file, avail);
+  await writeJson(file, avail);
   try {
-    logAvailability(player, kind, prev, clean, submitted);
+    await logAvailability(player, kind, prev, clean, submitted);
   } catch (_) {}
   res.json(avail);
 });
 
-app.post("/api/lock-night", (req, res) => {
-  const { map } = rosterById();
+app.post("/api/lock-night", async (req, res) => {
+  const { map } = await rosterById();
   const player = map[req.body && req.body.playerId];
   if (!player) return res.status(404).json({ error: "Unknown player" });
   if (player.role !== "Co-manager") {
@@ -175,10 +167,10 @@ app.post("/api/lock-night", (req, res) => {
   }
 
   const file = AVAIL_FILES[availKind(req)];
-  const avail = readJson(file);
+  const avail = await readJson(file);
   if (req.body.clear) {
     avail.lockedNight = null;
-    writeJson(file, avail);
+    await writeJson(file, avail);
     return res.json(avail);
   }
 
@@ -194,22 +186,22 @@ app.post("/api/lock-night", (req, res) => {
     lockedBy: player.name,
     lockedAt: new Date().toISOString(),
   };
-  writeJson(file, avail);
+  await writeJson(file, avail);
   res.json(avail);
 });
 
-app.get("/api/board", (_req, res) => {
-  res.json(readJson("announcements.json"));
+app.get("/api/board", async (_req, res) => {
+  res.json(await readJson("announcements.json"));
 });
 
 const JERSEY_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"];
 
-app.get("/api/jerseys", (_req, res) => {
-  res.json(readJson("jerseys.json"));
+app.get("/api/jerseys", async (_req, res) => {
+  res.json(await readJson("jerseys.json"));
 });
 
-app.post("/api/jerseys", (req, res) => {
-  const { map } = rosterById();
+app.post("/api/jerseys", async (req, res) => {
+  const { map } = await rosterById();
   const player = map[req.body && req.body.playerId];
   if (!player) return res.status(404).json({ error: "Unknown player" });
 
@@ -222,7 +214,7 @@ app.post("/api/jerseys", (req, res) => {
     return res.status(400).json({ error: "Pick a size" });
   }
 
-  const data = readJson("jerseys.json");
+  const data = await readJson("jerseys.json");
   const existing = data.requests.find((r) => r.playerId === player.id);
   const request = {
     id: existing ? existing.id : "j" + Date.now(),
@@ -235,12 +227,12 @@ app.post("/api/jerseys", (req, res) => {
   };
   data.requests = data.requests.filter((r) => r.playerId !== player.id);
   data.requests.unshift(request);
-  writeJson("jerseys.json", data);
+  await writeJson("jerseys.json", data);
   res.json(data);
 });
 
-app.post("/api/board", (req, res) => {
-  const { map } = rosterById();
+app.post("/api/board", async (req, res) => {
+  const { map } = await rosterById();
   const player = map[req.body && req.body.authorId];
   if (!player) return res.status(404).json({ error: "Unknown player" });
 
@@ -249,7 +241,7 @@ app.post("/api/board", (req, res) => {
   const category = String(req.body.category || "General").trim().slice(0, 32);
   if (!body) return res.status(400).json({ error: "Message required" });
 
-  const board = readJson("announcements.json");
+  const board = await readJson("announcements.json");
   board.posts.unshift({
     id: "p" + Date.now(),
     authorId: player.id,
@@ -259,12 +251,12 @@ app.post("/api/board", (req, res) => {
     title,
     body,
   });
-  writeJson("announcements.json", board);
+  await writeJson("announcements.json", board);
   res.json(board);
 });
 
-app.get("/api/contacts", (_req, res) => {
-  res.json(readJson("contacts.json"));
+app.get("/api/contacts", async (_req, res) => {
+  res.json(await readJson("contacts.json"));
 });
 
 const JOIN_POS = ["P", "C", "2B", "SS", "LF", "CF", "RF", "Util"];
@@ -306,27 +298,27 @@ function parseRecruit(body, requirePhone) {
   };
 }
 
-app.get("/api/recruits", (_req, res) => {
-  res.json(readJson("recruits.json"));
+app.get("/api/recruits", async (_req, res) => {
+  res.json(await readJson("recruits.json"));
 });
 
-app.post("/api/recruits", (req, res) => {
+app.post("/api/recruits", async (req, res) => {
   const parsed = parseRecruit(req.body, true);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
-  const data = readJson("recruits.json");
+  const data = await readJson("recruits.json");
   data.recruits.unshift({
     id: "r" + Date.now(),
     ...parsed.value,
     createdAt: new Date().toISOString(),
   });
-  writeJson("recruits.json", data);
+  await writeJson("recruits.json", data);
   res.json(data);
 });
 
-app.put("/api/recruits/:id", (req, res) => {
+app.put("/api/recruits/:id", async (req, res) => {
   const parsed = parseRecruit(req.body, false);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
-  const data = readJson("recruits.json");
+  const data = await readJson("recruits.json");
   const i = data.recruits.findIndex((r) => r.id === req.params.id);
   if (i < 0) return res.status(404).json({ error: "Unknown recruit" });
   data.recruits[i] = {
@@ -334,18 +326,18 @@ app.put("/api/recruits/:id", (req, res) => {
     ...parsed.value,
     updatedAt: new Date().toISOString(),
   };
-  writeJson("recruits.json", data);
+  await writeJson("recruits.json", data);
   res.json(data);
 });
 
 const FEE_MODELS = ["flat", "split", "core", "play"];
 
-app.get("/api/fees", (_req, res) => {
-  res.json(readJson("fees.json"));
+app.get("/api/fees", async (_req, res) => {
+  res.json(await readJson("fees.json"));
 });
 
-app.put("/api/fees", (req, res) => {
-  const { map } = rosterById();
+app.put("/api/fees", async (req, res) => {
+  const { map } = await rosterById();
   const player = map[req.body && req.body.playerId];
   if (!player) return res.status(404).json({ error: "Unknown player" });
   if (player.role !== "Co-manager") {
@@ -362,7 +354,7 @@ app.put("/api/fees", (req, res) => {
     : [];
 
   const fees = {
-    ...readJson("fees.json"),
+    ...(await readJson("fees.json")),
     model,
     teamTotal: num(req.body.teamTotal, 250),
     flatAmount: num(req.body.flatAmount, 25),
@@ -377,12 +369,12 @@ app.put("/api/fees", (req, res) => {
     updatedBy: player.name,
     updatedAt: new Date().toISOString(),
   };
-  writeJson("fees.json", fees);
+  await writeJson("fees.json", fees);
   res.json(fees);
 });
 
-app.put("/api/fees/ledger", (req, res) => {
-  const { map } = rosterById();
+app.put("/api/fees/ledger", async (req, res) => {
+  const { map } = await rosterById();
   const incoming = req.body && req.body.ledger;
   if (!incoming || typeof incoming !== "object") {
     return res.status(400).json({ error: "ledger required" });
@@ -396,11 +388,22 @@ app.put("/api/fees/ledger", (req, res) => {
       comment: String((row && row.comment) || "").trim().slice(0, 240),
     };
   }
-  const fees = { ...readJson("fees.json"), ledger };
-  writeJson("fees.json", fees);
+  const fees = { ...(await readJson("fees.json")), ledger };
+  await writeJson("fees.json", fees);
   res.json(fees);
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Wizards hub running at http://localhost:${PORT}`);
-});
+init()
+  .then(() => {
+    app.use((err, _req, res, _next) => {
+      console.error(err);
+      res.status(500).json({ error: String(err.message || err) });
+    });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Wizards hub running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

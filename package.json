@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "deploy": "bash scripts/deploy-hostinger.sh",
+    "deploy": "bash scripts/deploy-hostinger.sh --with-data",
+    "deploy:code": "bash scripts/deploy-hostinger.sh --skip-data",
     "deploy:fresh": "bash scripts/deploy-hostinger.sh --with-data"
   },
   "engines": {
