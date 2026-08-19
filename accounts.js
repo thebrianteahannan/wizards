@@ -196,6 +196,23 @@ function attachAuth(app) {
     });
   });
 
+  app.get("/api/auth/claimed-players", async (_req, res) => {
+    const players = await rosterPlayers();
+    const data = await loadAccounts();
+    const rows = [];
+    for (const u of data.users) {
+      if (!u.active) continue;
+      const p = playerFromUser(u, players);
+      rows.push({
+        username: u.username,
+        name: (p && p.name) || u.username,
+        number: p ? p.number : null,
+      });
+    }
+    rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    res.json({ players: rows });
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     const password = String((req.body && req.body.password) || "");
     const invite = String((req.body && req.body.invite) || "")

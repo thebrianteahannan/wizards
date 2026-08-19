@@ -8,8 +8,10 @@ function renderLogin() {
         <h2>I have a login</h2>
         <form id="login-form">
           <div class="form-row">
-            <label>Username</label>
-            <input name="username" required minlength="3" maxlength="40" autocomplete="username" placeholder="Brian Hannan" />
+            <label>Name</label>
+            <select name="username" required>
+              <option value="">Loading names…</option>
+            </select>
           </div>
           <div class="form-row">
             <label>Password</label>
@@ -46,8 +48,10 @@ function renderLogin() {
         <p class="muted">No email reset. This pings Brian. He will set a new password and tell you.</p>
         <form id="reset-form">
           <div class="form-row">
-            <label>Username</label>
-            <input name="username" required minlength="3" maxlength="40" />
+            <label>Name</label>
+            <select name="username" required>
+              <option value="">Loading names…</option>
+            </select>
           </div>
           <button class="btn ghost" type="submit">Ask for a reset</button>
           <p class="muted reset-msg"></p>
@@ -62,6 +66,7 @@ function bindLogin() {
   const register = document.getElementById("register-form");
   const reset = document.getElementById("reset-form");
   if (login) {
+    fillClaimedPlayers(login);
     login.addEventListener("submit", async (e) => {
       e.preventDefault();
       const msg = login.querySelector(".login-msg");
@@ -95,6 +100,7 @@ function bindLogin() {
     });
   }
   if (reset) {
+    fillClaimedPlayers(reset);
     reset.addEventListener("submit", async (e) => {
       e.preventDefault();
       const msg = reset.querySelector(".reset-msg");
@@ -106,6 +112,33 @@ function bindLogin() {
         msg.textContent = err.message;
       }
     });
+  }
+}
+
+async function fillClaimedPlayers(form) {
+  const sel = form.querySelector("select[name='username']");
+  const btn = form.querySelector("button[type='submit']");
+  if (!sel) return;
+  try {
+    const data = await api.get("/api/auth/claimed-players");
+    const players = data.players || [];
+    if (!players.length) {
+      sel.innerHTML = `<option value="">Nobody has a login yet</option>`;
+      sel.disabled = true;
+      if (btn) btn.disabled = true;
+      return;
+    }
+    sel.innerHTML = [`<option value="">Pick your name</option>`]
+      .concat(
+        players.map(
+          (p) =>
+            `<option value="${escapeHtml(p.username)}">${escapeHtml(p.number != null ? p.name + " #" + p.number : p.name)}</option>`
+        )
+      )
+      .join("");
+  } catch (_) {
+    sel.innerHTML = `<option value="">Could not load names</option>`;
+    if (btn) btn.disabled = true;
   }
 }
 
