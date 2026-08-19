@@ -21,6 +21,7 @@ const FILES = [
 let url = "";
 let key = "";
 let supabaseOk = false;
+let lastError = "";
 
 function loadEnv() {
   try {
@@ -31,10 +32,7 @@ function loadEnv() {
       const i = cut.indexOf("=");
       if (i < 1) continue;
       const name = cut.slice(0, i);
-      let val = cut.slice(i + 1);
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
+      let val = strip(cut.slice(i + 1));
       if (!process.env[name]) process.env[name] = val;
     }
   } catch (_) {}
@@ -44,7 +42,16 @@ function usingDb() {
   return supabaseOk;
 }
 
+function hideSecret(msg) {
+  let s = String(msg || "unknown").slice(0, 220);
+  if (key) s = s.split(key).join("[key]");
+  return s;
+}
+
 async function sb(pathname, options) {
+  if (typeof fetch !== "function") {
+    throw new Error("Node " + process.version + " has no fetch");
+  }
   const res = await fetch(url + "/rest/v1/" + pathname, {
     ...options,
     headers: {
@@ -56,14 +63,19 @@ async function sb(pathname, options) {
     },
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(text || res.statusText);
-  return text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error((text || res.statusText).slice(0, 220));
+  return text ? JSON.parse(text) : [];
 }
 
 function strip(v) {
-  v = String(v || "").trim();
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-  return v.trim();
+  v = String(v || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r/g, "")
+    .trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim();
+  }
+  return v.replace(/^Bearer\s+/i, "").trim();
 }
 
 async function init() {
@@ -71,17 +83,21 @@ async function init() {
   url = strip(process.env.SUPABASE_URL).replace(/\/$/, "");
   key = strip(process.env.SUPABASE_SERVICE_ROLE_KEY);
   fs.mkdirSync(DATA, { recursive: true });
+  lastError = "";
   if (url && key) {
     try {
-      const rows = await sb("kv?select=k", { method: "GET", prefer: "count=exact" });
+      const rows = await sb("kv?select=k", { method: "GET", prefer: "count=exact,return=representation" });
       supabaseOk = true;
-      if (!rows.length) await seedFromFiles();
+      if (!Array.isArray(rows) || !rows.length) await seedFromFiles();
       console.log("Data: Supabase " + url.replace(/^https:\/\//, ""));
       return;
     } catch (err) {
       supabaseOk = false;
-      console.error("Supabase unavailable, using JSON files:", err.message);
+      lastError = hideSecret(err && err.message);
+      console.error("Supabase unavailable, using JSON files:", lastError);
     }
+  } else {
+    lastError = "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY";
   }
   console.log("Data: JSON files in " + DATA);
 }
@@ -138,6 +154,8 @@ function status() {
     data: usingDb() ? "supabase" : "files",
     hasUrl: Boolean(strip(process.env.SUPABASE_URL)),
     hasKey: Boolean(strip(process.env.SUPABASE_SERVICE_ROLE_KEY)),
+    node: process.version,
+    error: lastError || undefined,
   };
 }
 
