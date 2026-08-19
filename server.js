@@ -58,8 +58,63 @@ function isWindowId(w) {
   return WINDOWS.includes(w) || /^t-[a-z0-9-]{1,32}$/.test(String(w || ""));
 }
 
+function readActivity() {
+  try {
+    const log = readJson("activity.json");
+    return Array.isArray(log.entries) ? log : { entries: [] };
+  } catch (_) {
+    return { entries: [] };
+  }
+}
+
+function capDay(key) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+    return new Date(key + "T12:00:00").toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }
+  const s = String(key || "");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function stampAvail(entry) {
+  if (!entry) return "—";
+  const status = entry.status || "no";
+  if (status === "no") return "no";
+  const hints = { afternoon: "12-5", evening: "5-9", night: "9-11" };
+  const wins = (entry.windows || []).map((id) => hints[id] || String(id).replace(/^t-/, "").replace(/-/g, " "));
+  return wins.length ? status + " · " + wins.join(", ") : status;
+}
+
+function logAvailability(player, kind, prevDays, nextDays, keys) {
+  const lines = [];
+  for (const key of keys) {
+    if (stampAvail(prevDays[key]) === stampAvail(nextDays[key])) continue;
+    lines.push(capDay(key) + ": " + stampAvail(prevDays[key]) + " → " + stampAvail(nextDays[key]));
+  }
+  if (!lines.length) return;
+  const log = readActivity();
+  log.entries.unshift({
+    id: "a" + Date.now(),
+    at: new Date().toISOString(),
+    playerId: player.id,
+    playerName: player.name,
+    kind,
+    action: Object.keys(prevDays || {}).length ? "updated" : "set",
+    lines,
+  });
+  log.entries = log.entries.slice(0, 400);
+  writeJson("activity.json", log);
+}
+
 app.get("/api/availability", (req, res) => {
   res.json(readJson(AVAIL_FILES[availKind(req)]));
+});
+
+app.get("/api/activity", (_req, res) => {
+  res.json(readActivity());
 });
 
 app.put("/api/availability/:playerId", (req, res) => {
@@ -72,10 +127,12 @@ app.put("/api/availability/:playerId", (req, res) => {
     return res.status(400).json({ error: "days object required" });
   }
 
-  const file = AVAIL_FILES[availKind(req)];
+  const kind = availKind(req);
+  const file = AVAIL_FILES[kind];
   const avail = readJson(file);
   const prev = ((avail.players[player.id] || {}).days) || {};
   const clean = { ...prev };
+  const submitted = [];
   for (const day of DAYS) {
     if (!Object.prototype.hasOwnProperty.call(days, day)) continue;
     const entry = days[day] || {};
@@ -84,6 +141,7 @@ app.put("/api/availability/:playerId", (req, res) => {
       ? entry.windows.filter((w) => isWindowId(w)).slice(0, 8)
       : [];
     clean[day] = { status, windows: status === "no" ? [] : windows };
+    submitted.push(day);
   }
   for (const key of Object.keys(days)) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
@@ -93,6 +151,7 @@ app.put("/api/availability/:playerId", (req, res) => {
       ? entry.windows.filter((w) => isWindowId(w)).slice(0, 8)
       : [];
     clean[key] = { status, windows: status === "no" ? [] : windows };
+    submitted.push(key);
   }
 
   avail.players[player.id] = {
@@ -101,6 +160,9 @@ app.put("/api/availability/:playerId", (req, res) => {
     days: clean,
   };
   writeJson(file, avail);
+  try {
+    logAvailability(player, kind, prev, clean, submitted);
+  } catch (_) {}
   res.json(avail);
 });
 

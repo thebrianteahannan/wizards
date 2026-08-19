@@ -1,7 +1,7 @@
 const AVAIL_META = {
   league: {
     kind: "league",
-    title: "Upcoming events",
+    title: "League night",
     lede: "Mark the windows Adam sent. Green at NEED yes.",
     from: "From Adam",
     board: "Windows on the board",
@@ -78,7 +78,8 @@ function availTabs(kind) {
       <a class="btn ghost${kind === "league" ? " on" : ""}" href="#/availability">League Night</a>
       <a class="btn ghost${kind === "tournament" ? " on" : ""}" href="#/tournament">Tournament</a>
       <a class="btn ghost${kind === "practice" ? " on" : ""}" href="#/practice">Practice</a>
-    </div>`;
+    </div>
+    <p style="margin:0.45rem 0 1rem"><a href="#/activity">Activity log</a></p>`;
 }
 
 async function renderAvailability(roster, avail, playerId, kind) {
@@ -251,12 +252,19 @@ function bindAvailability(roster, skipAsk, kind, avail) {
       card.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
+  const promptFirst = (id, after) => {
+    const first = page.kind === "league" ? firstWindowOffer(avail || {}) : null;
+    const day = first && offerKey(first, page.kind);
+    const answered = day && ((((avail || {}).players || {})[id] || {}).days || {})[day];
+    if (first && !answered) askFirstWindow(id, first, avail, page.kind, (focusDate) => redraw(id, true, focusDate));
+    else if (after) after();
+  };
   if (!skipAsk) {
     askWho(roster.players, (id) => {
-      const first = page.kind === "league" ? firstWindowOffer(avail || {}) : null;
-      if (first) askFirstWindow(id, first, avail, page.kind, (focusDate) => redraw(id, true, focusDate));
-      else redraw(id, true);
+      promptFirst(id, () => redraw(id, true));
     });
+  } else if (select.value) {
+    promptFirst(select.value);
   }
   select.addEventListener("change", async () => {
     if (!select.value) return;
@@ -320,4 +328,32 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     card.classList.add("focus");
     card.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+}
+
+function renderActivity(log) {
+  const labels = { league: "League Night", tournament: "Tournament", practice: "Practice" };
+  const rows = (log.entries || [])
+    .map((e) => {
+      const d = new Date(e.at);
+      const day = Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const time = Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      const detail = (e.lines || []).map((line) => escapeHtml(line)).join("<br>");
+      return `
+      <article class="event">
+        <time>${escapeHtml(day)}</time>
+        <div>
+          <div class="kind">${escapeHtml(time)} · ${escapeHtml(labels[e.kind] || e.kind)} · ${e.action === "set" ? "set" : "updated"}</div>
+          <h3>${escapeHtml(e.playerName)}</h3>
+          <p>${detail || "Saved."}</p>
+        </div>
+      </article>`;
+    })
+    .join("");
+  return `
+    <p class="kicker">Team only</p>
+    <h1>Activity log</h1>
+    <p class="lede">Every League Night, Tournament, and Practice save. Newest first. This lives in data/ with the rest of the live files.</p>
+    ${availTabs("activity")}
+    <div class="timeline">${rows || '<p class="muted">No saves logged yet. Once someone hits Save, it shows up here.</p>'}</div>
+  `;
 }

@@ -1,0 +1,27 @@
+---
+description: On push/merge, report any new or changed data JSON the live Hostinger site may need.
+alwaysApply: true
+---
+
+# Data files on push and merge
+
+When the user says **push**, **merge**, **push and merge**, or asks to ship/deploy this repo, **tell them about `data/` before or with the result**. Do not wait for them to ask. Live player data lives only on Hostinger; `data/*.json` is gitignored on purpose.
+
+## Check
+
+1. List `data/*.json` on disk.
+2. Grep `server.js` (and any new API code) for JSON filenames (`readJson`, `writeJson`, `AVAIL_FILES`).
+3. Note anything this session added or edited under `data/`, even though Git will not show it.
+
+## Tell them, plainly
+
+- **New file** the server reads (e.g. `activity.json`): Hostinger will not have it until they create or upload that one file once. Regular `npm run deploy` skips `data/`.
+- **Changed shape** of an existing file (new required fields, renamed keys): say which file and what to add on the live copy. Do **not** upload a full local `data/` folder over Hostinger.
+- **Local JSON edited** (roster, schedule, phones, etc.) that they may *want* live: name the files and ask before touching the server. Never silently overwrite votes, recruits, chat, dues, or availability.
+- **Nothing data-related**: say that explicitly.
+
+## Do not
+
+- Commit or zip `data/*.json` unless they clearly ask.
+- Run `npm run deploy:fresh` after go-live.
+- Skip this report because the JSON is gitignored.

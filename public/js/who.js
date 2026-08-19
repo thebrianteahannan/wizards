@@ -9,18 +9,19 @@ function writeWhoCookie(id) {
 
 function suggestedPlayerId(players) {
   const saved = readWhoCookie();
-  if (saved && players && players.length) {
-    const hit = players.find((p) => p.name === saved || playerLabel(p) === saved || p.id === saved);
+  const local = localStorage.getItem("wizardsPlayerId") || "";
+  if (players && players.length) {
+    const hit = players.find((p) => p.id === saved || p.id === local || p.name === saved || playerLabel(p) === saved);
     if (hit) return hit.id;
+    return "";
   }
-  return localStorage.getItem("wizardsPlayerId") || "";
+  return local || saved || "";
 }
 
-function rememberPlayerId(id, name) {
+function rememberPlayerId(id) {
   if (!id) return;
   localStorage.setItem("wizardsPlayerId", id);
-  const fromSelect = [...document.querySelectorAll("select option")].find((o) => o.value === id);
-  writeWhoCookie(name || (fromSelect && fromSelect.textContent.trim()) || readWhoCookie() || id);
+  writeWhoCookie(id);
 }
 
 function clearWhoModal() {
@@ -29,16 +30,15 @@ function clearWhoModal() {
 }
 
 function askWho(players, onPick) {
-  clearWhoModal();
   const suggested = suggestedPlayerId(players);
-  const known = players.some((p) => p.id === suggested);
+  if (suggested && players.some((p) => p.id === suggested)) {
+    rememberPlayerId(suggested);
+    onPick(suggested);
+    return;
+  }
+  clearWhoModal();
   const opts = [`<option value="">Select a Wizard</option>`]
-    .concat(
-      players.map((p) => {
-        const sel = known && p.id === suggested ? " selected" : "";
-        return `<option value="${escapeHtml(p.id)}"${sel}>${escapeHtml(playerLabel(p))}</option>`;
-      })
-    )
+    .concat(players.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(playerLabel(p))}</option>`))
     .join("");
   const wrap = document.createElement("div");
   wrap.id = "who-modal";
@@ -47,7 +47,7 @@ function askWho(players, onPick) {
     <form class="card who-card">
       <p class="kicker">Roster check</p>
       <h2>Who are you?</h2>
-      <p class="muted">${known ? "Last time you were the highlighted name. Confirm or switch." : "Pick your name. We’ll suggest it next time."}</p>
+      <p class="muted">Pick your name. We’ll remember it on this device.</p>
       <div class="form-row">
         <select name="who" required>${opts}</select>
       </div>
@@ -58,8 +58,7 @@ function askWho(players, onPick) {
     e.preventDefault();
     const id = String(new FormData(e.target).get("who") || "").trim();
     if (!id) return;
-    const picked = players.find((p) => p.id === id);
-    rememberPlayerId(id, picked ? picked.name : "");
+    rememberPlayerId(id);
     wrap.remove();
     onPick(id);
   });
