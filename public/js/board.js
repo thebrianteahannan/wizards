@@ -46,7 +46,7 @@ function renderBoard(roster, board) {
     .join("");
   return `
     <p class="kicker">Live locker room</p>
-    <h1>Board</h1>
+    <h1>Announcements</h1>
     <p class="lede">Who can drive, who has bats, who is late. Talk like the group chat.</p>
     <section class="chat-shell">
       <div class="chat-thread" id="chat-thread">${renderChatMessages(board, savedId)}</div>

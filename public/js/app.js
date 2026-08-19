@@ -9,6 +9,8 @@ const routes = {
   "/dues": "dues",
   "/admin": "admin",
   "/league": "league",
+  "/join": "join",
+  "/recruits": "recruits",
 };
 
 async function load() {
@@ -85,6 +87,16 @@ async function load() {
       }
     } else if (route === "league") {
       app.innerHTML = renderLeague();
+    } else if (route === "join") {
+      app.innerHTML = renderJoin();
+      bindJoin();
+    } else if (route === "recruits") {
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        app.innerHTML = renderRecruits(await api.get("/api/recruits"));
+      }
     }
   } catch (err) {
     app.innerHTML = `<p class="notice">Could not load this page. ${escapeHtml(err.message)}</p>`;

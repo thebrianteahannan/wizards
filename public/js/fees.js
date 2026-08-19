@@ -119,6 +119,21 @@ function renderDues(roster, fees) {
         ${model !== "play" ? `<p class="muted">At this roster size the flat/split take is ${money(collected)} against a ${money(total)} bill.</p>` : ""}
       </article>
       <article class="card">
+        <h2>Pay Brian</h2>
+        <p class="muted">Dues go to Brian Hannan. Tap a link and send your amount.</p>
+        <div class="actions">
+          <a class="btn" href="https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&amp;business=bthannan%40gmail.com&amp;currency_code=USD&amp;item_name=Wizards%20of%20Wiff%20dues" target="_blank" rel="noopener">PayPal</a>
+          <a class="btn ghost" href="https://venmo.com/u/Brian-Hannan-14" target="_blank" rel="noopener">Venmo</a>
+          <a class="btn ghost" href="https://cash.app/$bthannan" target="_blank" rel="noopener">Cash App</a>
+        </div>
+        <ul class="rules">
+          <li>PayPal: bthannan@gmail.com</li>
+          <li>Venmo: @Brian-Hannan-14</li>
+          <li>Cash App: $bthannan</li>
+        </ul>
+      </article>
+    </section>
+    <article class="card" style="margin-top:1rem">
         <h2>The simple version</h2>
         <ul class="rules">
           <li>The league fee is a team bill, not a per-game ticket from PLW.</li>
@@ -126,8 +141,7 @@ function renderDues(roster, fees) {
           <li>If you are on the roster, you are in the current model until a manager changes it.</li>
           <li>${isAdmin() ? `Co-managers can switch models on the <a href="#/admin">Admin</a> page.` : "Co-managers set the model. Ping Tony or Brian if yours looks wrong."}</li>
         </ul>
-      </article>
-    </section>
+    </article>
     <h2 style="margin-top:1.4rem">Who owes what</h2>
     <div class="card" style="overflow:auto">
       <table class="dues-table">

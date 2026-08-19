@@ -28,13 +28,8 @@ function syncGates() {
   document.querySelectorAll("[data-need='admin']").forEach((el) => {
     el.hidden = !isAdmin();
   });
-  const status = document.getElementById("team-status");
   const leave = document.getElementById("team-leave");
   const form = document.getElementById("team-gate");
-  if (status) {
-    status.hidden = !isTeam();
-    status.textContent = isAdmin() ? "Admin mode" : isTeam() ? "Team mode" : "";
-  }
   if (leave) leave.hidden = !isTeam();
   if (form) form.hidden = isTeam();
 }
@@ -45,7 +40,7 @@ function renderLock(kind) {
     <section class="card lock-card">
       <p class="kicker">${admin ? "Managers only" : "Wizards only"}</p>
       <h1>${admin ? "Admin lock" : "Team lock"}</h1>
-      <p class="lede">${admin ? "Enter the admin password to change dues and club settings." : "Enter the team password to open League Night, the board, and dues."}</p>
+      <p class="lede">${admin ? "Enter the admin password to change dues and club settings." : "Enter the team password to open League Night, announcements, and dues."}</p>
       <form id="page-lock" class="lock-form">
         <input name="password" type="password" autocomplete="off" placeholder="Password" required />
         <button class="btn" type="submit">Unlock</button>
@@ -107,7 +102,7 @@ function bindHeaderGate() {
     leave.addEventListener("click", () => {
       setTeam(false);
       syncGates();
-      if (/availability|board|dues|admin/.test(location.hash)) location.hash = "#/";
+      if (/availability|board|dues|admin|recruits/.test(location.hash)) location.hash = "#/";
       else load();
     });
   }

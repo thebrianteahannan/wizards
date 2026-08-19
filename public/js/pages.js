@@ -22,8 +22,8 @@ function renderHome(roster, schedule, avail, fees) {
   const team = isTeam();
   const hudNight = team && best ? `${best.yes}/6 · ${cap(best.day)}` : "Wizards";
   const actions = team
-    ? `<a class="btn" href="#/availability">Set your nights</a><a class="btn ghost" href="#/board">Team board</a>`
-    : `<a class="btn" href="#/roster">See the roster</a><a class="btn ghost" href="#/schedule">Schedule</a>`;
+    ? `<a class="btn" href="#/availability">Set your nights</a><a class="btn ghost" href="#/board">Announcements</a>`
+    : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a>`;
   const nightCard = team
     ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>League night</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
     : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>The league</h3><p class="muted">Florida Challengers League in Brooksville.</p></a>`;
@@ -35,7 +35,7 @@ function renderHome(roster, schedule, avail, fees) {
     : `<article class="card stat"><b>$250</b>team fee for the year</article>`;
   const pulse = team
     ? `<article class="card"><p class="kicker">Availability pulse</p><h2>${best && best.yes >= 6 ? "We can field a night" : "Still hunting a night"}</h2><p>${best ? `<span class="${best.yes >= 6 ? "ok" : "warn"}">${best.yes} yes / ${best.maybe} maybe</span> on ${cap(best.day)} ${best.window}` : "Nobody has filled nights yet. Grab League Night and tap your week."}</p><p class="muted">Fall league is flexible weeknights and weekends until the lights are fully in.</p></article>`
-    : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League Night, the board, and dues open with the team password in the header.</p></article>`;
+    : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League Night, announcements, and dues open with the team password in the header.</p></article>`;
   return `
     ${team && locked ? `<div class="banner"><strong>League night locked:</strong> ${escapeHtml(cap(locked.day))} ${escapeHtml(locked.window)} — set by ${escapeHtml(locked.lockedBy)}</div>` : ""}
     <section class="hero">
@@ -229,7 +229,7 @@ function bindRoster(roster) {
 }
 
 function renderSchedule(schedule, avail, view, monthKey) {
-  view = view || localStorage.getItem("wizardsSchedView") || "list";
+  view = view || localStorage.getItem("wizardsSchedView") || "calendar";
   const events = schedule.events || [];
   const first = events[0] && events[0].date ? events[0].date.slice(0, 7) : "2026-08";
   monthKey = monthKey || localStorage.getItem("wizardsSchedMonth") || first;
@@ -244,9 +244,7 @@ function renderSchedule(schedule, avail, view, monthKey) {
         <div>
           <div class="kind">${escapeHtml(e.kind)} · ${escapeHtml(e.status)}</div>
           <h3>${escapeHtml(e.title)}</h3>
-          <p>${escapeHtml(e.when)}</p>
-          <p class="muted">${escapeHtml(e.detail)}</p>
-          ${e.link ? `<p><a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch / source</a></p>` : ""}
+          <p>${escapeHtml(e.when)}${e.detail ? ` <span class="muted">· ${escapeHtml(e.detail)}</span>` : ""}${e.link ? ` · <a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch</a>` : ""}</p>
         </div>
       </article>`)
     .join("");
@@ -412,6 +410,9 @@ function bindGear(roster) {
 }
 
 function renderLeague() {
+  const parents = [...new Set([location.hostname || "localhost", "localhost", "127.0.0.1"])]
+    .map((h) => "parent=" + encodeURIComponent(h))
+    .join("&");
   return `
     <p class="kicker">Premier League WIFFLE®</p>
     <h1>League desk</h1>
@@ -448,13 +449,8 @@ function renderLeague() {
     </div>
     <section class="card" style="margin-top:1rem">
       <h2>Opening night replay</h2>
-      <p class="muted">Twitch VOD — parent set to localhost for local viewing.</p>
       <div class="twitch-wrap">
-        <iframe
-          src="https://player.twitch.tv/?video=2834716125&parent=localhost&autoplay=false"
-          allowfullscreen
-          title="PLW Opening Night Twitch replay">
-        </iframe>
+        <iframe src="https://player.twitch.tv/?video=2834716125&${parents}&autoplay=false" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen title="PLW Opening Night Twitch replay"></iframe>
       </div>
       <p style="margin-top:0.7rem"><a href="https://www.twitch.tv/videos/2834716125" target="_blank" rel="noopener">Open on Twitch</a> · <a href="https://www.twitch.tv/premierwiffle" target="_blank" rel="noopener">twitch.tv/premierwiffle</a></p>
     </section>

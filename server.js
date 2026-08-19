@@ -169,6 +169,45 @@ app.post("/api/board", (req, res) => {
   res.json(board);
 });
 
+const JOIN_POS = ["P", "C", "2B", "SS", "LF", "CF", "RF", "Util"];
+
+app.get("/api/recruits", (_req, res) => {
+  res.json(readJson("recruits.json"));
+});
+
+app.post("/api/recruits", (req, res) => {
+  const firstName = String((req.body && req.body.firstName) || "").trim().slice(0, 40);
+  const lastName = String((req.body && req.body.lastName) || "").trim().slice(0, 40);
+  const number = Number.parseInt(String((req.body && req.body.number) ?? ""), 10);
+  const primary = String((req.body && req.body.primary) || "").trim();
+  const secondary = String((req.body && req.body.secondary) || "").trim();
+  const experience = String((req.body && req.body.experience) || "").trim().slice(0, 200);
+  const why = String((req.body && req.body.why) || "").trim().slice(0, 800);
+  if (!firstName || !lastName) return res.status(400).json({ error: "First and last name required" });
+  if (!Number.isInteger(number) || number < 0 || number > 99) {
+    return res.status(400).json({ error: "Jersey number must be 0-99" });
+  }
+  if (!JOIN_POS.includes(primary)) return res.status(400).json({ error: "Pick a primary position" });
+  if (secondary && !JOIN_POS.includes(secondary)) return res.status(400).json({ error: "Pick a valid secondary" });
+  if (!experience) return res.status(400).json({ error: "Tell us how long you have been playing" });
+  if (!why) return res.status(400).json({ error: "Tell us why you want to play" });
+
+  const data = readJson("recruits.json");
+  data.recruits.unshift({
+    id: "r" + Date.now(),
+    firstName,
+    lastName,
+    number,
+    primary,
+    secondary: secondary || "",
+    experience,
+    why,
+    createdAt: new Date().toISOString(),
+  });
+  writeJson("recruits.json", data);
+  res.json(data);
+});
+
 const FEE_MODELS = ["flat", "split", "core", "play"];
 
 app.get("/api/fees", (_req, res) => {
