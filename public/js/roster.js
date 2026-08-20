@@ -1,6 +1,5 @@
-function onSquad(p, squad) {
-  const s = p.squads || ["league"];
-  return s.includes(squad);
+function onSquad(_p, _squad) {
+  return true;
 }
 
 function nextProposed(avail) {
@@ -213,7 +212,7 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId) {
   const note = !players.length
     ? `<p class="muted">Select a date to see that night's potential roster.</p>`
     : mound
-    ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Cyan is yes, gold is maybe.</p>`
+    ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Green is committed, gold is maybe.</p>`
     : `<p class="muted">Bench / unassigned</p>`;
   return `
     <div class="diamond-card card">
@@ -358,7 +357,7 @@ function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, head
 
 function renderRoster(roster, squad, leagueAvail, tourneyAvail) {
   return `
-    <p class="lede">League nights and Saturday tournaments are different books. Co-managers: Tony Kurtanick and Brian Hannan.</p>
+    <p class="lede">One Wizards book. League and Tournament only change which dates light up on the diamond. Co-managers: Tony Kurtanick and Brian Hannan.</p>
     ${isTeam() ? `<div class="actions" style="margin:0.7rem 0 0"><button class="btn ghost" type="button" id="show-phones">Phone numbers</button></div><div id="phone-list" class="card phone-list" hidden></div>` : ""}
     ${renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, "dg-roster", "h1")}
   `;

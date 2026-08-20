@@ -325,9 +325,9 @@ a.hud:hover { border-color: var(--cyan); }
 .spot small { display: block; color: var(--cyan); letter-spacing: 0.12em; font-size: 0.62rem; }
 .spot b { display: block; font-size: 0.72rem; font-weight: 600; }
 .spot.empty { opacity: 0.45; box-shadow: none; min-width: 42px; padding: 0.12rem 0.25rem; }
-.spot.going { border-color: var(--cyan); box-shadow: 0 0 18px rgba(34, 211, 238, 0.45); }
+.spot.going { border-color: var(--go); box-shadow: 0 0 18px rgba(52, 245, 160, 0.45); }
 .spot.maybe-go { border-color: var(--gold); }
-.spot b.yes { color: var(--cyan); text-shadow: 0 0 10px rgba(34, 211, 238, 0.8); }
+.spot b.yes { color: var(--go); text-shadow: 0 0 10px rgba(52, 245, 160, 0.8); }
 .spot b.maybe { color: var(--gold); }
 
 .timeline { display: grid; gap: 0.35rem; }
