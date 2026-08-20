@@ -33,9 +33,14 @@ function syncGates() {
   if (who) {
     who.hidden = !isTeam();
     who.textContent = session ? session.username : "";
+    if (isAdmin()) {
+      who.setAttribute("href", "#/admin");
+      who.classList.remove("muted");
+    } else {
+      who.removeAttribute("href");
+      who.classList.add("muted");
+    }
   }
-  const join = document.getElementById("nav-join");
-  if (join) join.textContent = isTeam() ? "Recruit" : "Join";
 }
 
 function renderLock(kind) {
@@ -62,7 +67,7 @@ function bindHeaderGate() {
       } catch (_) {}
       session = null;
       syncGates();
-      if (/availability|tournament|practice|activity|board|dues|admin|recruits|gear|strategy|login/.test(location.hash)) {
+      if (/availability|tournament|practice|activity|board|dues|admin|recruits|gear|strategy|team|login/.test(location.hash)) {
         location.hash = "#/";
       } else load();
     });

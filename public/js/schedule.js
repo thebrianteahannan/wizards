@@ -53,6 +53,8 @@ function renderCalendarMonth(events, monthKey, packs) {
   for (const e of events) {
     (byDay[e.date] || (byDay[e.date] = [])).push(e);
   }
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const firstDow = start.getDay();
   const daysInMonth = new Date(y, m, 0).getDate();
   const cells = [];
@@ -62,15 +64,22 @@ function renderCalendarMonth(events, monthKey, packs) {
     const hits = byDay[iso] || [];
     const tags = calDayTags(hits, packs);
     const pills = hits.map((e) => calPill(e, packs)).join("");
+    const todayOn = iso === today;
+    const dayN = todayOn ? `${d} · Today` : String(d);
+    const todayLook = todayOn
+      ? "border-color:var(--gold);box-shadow:0 0 14px rgba(240,193,75,0.45);background:rgba(240,193,75,0.1)"
+      : "";
+    const numStyle = todayOn ? ' style="color:var(--gold);font-weight:700"' : "";
     if (hits.length === 1 && isTeam()) {
       const e = hits[0];
       const p = calPillBits(e, packs);
       const href = `#/${p.path}?date=${escapeHtml(e.date)}`;
       cells.push(
-        `<a class="cal-cell has" href="${href}" style="color:inherit;text-decoration:none;cursor:pointer"><span class="cal-n">${d}</span>${tags}<span class="${p.cls}" title="${p.title}">${p.title}</span></a>`
+        `<a class="cal-cell has" href="${href}" style="color:inherit;text-decoration:none;cursor:pointer;${todayLook}"><span class="cal-n"${numStyle}>${dayN}</span>${tags}<span class="${p.cls}" title="${p.title}">${p.title}</span></a>`
       );
     } else {
-      cells.push(`<div class="cal-cell ${hits.length ? "has" : ""}"><span class="cal-n">${d}</span>${tags}${pills}</div>`);
+      const extra = todayLook ? ` style="${todayLook}"` : "";
+      cells.push(`<div class="cal-cell ${hits.length ? "has" : ""}"${extra}><span class="cal-n"${numStyle}>${dayN}</span>${tags}${pills}</div>`);
     }
   }
   const heads = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((h) => `<div class="cal-h">${h}</div>`).join("");

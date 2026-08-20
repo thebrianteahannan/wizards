@@ -130,7 +130,7 @@ async function renderAvailability(roster, avail, playerId, kind) {
         ? `<button class="btn" data-lock="${day}" data-window="${best.w.id}" type="button">Lock</button>`
         : "";
     return `
-      <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}">
+      <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}" style="cursor:pointer">
         <h3>${num ? `<span class="day-num">${num}</span>` : ""}${label}</h3>
         <p class="day-note">${escapeHtml(offer.note)}</p>
         <div class="win-line">${counts}</div>
@@ -182,9 +182,10 @@ async function renderAvailability(roster, avail, playerId, kind) {
     </section>` : page.kind === "practice" ? "" : `<p class="muted">No dates on the board yet.</p>`}
     ${locked ? `<div class="banner">Locked: <strong>${escapeHtml(lockLabel(locked.day))} ${escapeHtml(locked.window)}</strong> by ${escapeHtml(locked.lockedBy)}. ${isManager ? '<button class="btn ghost" id="clear-lock" type="button">Clear lock</button>' : ""}</div>` : ""}
     <form id="avail-form">
-      <p id="avail-msg" class="muted"></p>
+      <p id="avail-msg" class="muted">Tap a date card to see that night's diamond. Radios still save your answer.</p>
       <div class="day-grid">${dayCols}</div>
     </form>
+    ${renderEmptyNightDiamond()}
   `;
 }
 
@@ -291,7 +292,8 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     bindAvailability(r, skip, page.kind, a);
     const card = focusDate && document.querySelector(`article.day[data-date="${focusDate}"]`);
     if (card) {
-      card.classList.add("focus");
+      const offer = (a.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
+      if (offer) paintAvailDiamond(card, r, a, page.kind, offer, false);
       card.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
@@ -327,12 +329,24 @@ function bindAvailability(roster, skipAsk, kind, avail) {
         if (n !== saveN) return;
         if (next && next.players) avail.players = next.players;
         if (msg) msg.textContent = "Saved.";
+        const open = document.getElementById("avail-diamond");
+        if (open && open.dataset.day === day) {
+          const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === day);
+          if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, false);
+        }
       })
       .catch((err) => {
         if (msg) msg.textContent = err.message;
       });
   });
   form.querySelectorAll("article.day").forEach((card) => paintLiveDay(card, avail, roster));
+  form.addEventListener("click", (e) => {
+    if (e.target.closest("input, label, button, a, select")) return;
+    const card = e.target.closest("article.day");
+    if (!card) return;
+    const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
+    if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, true);
+  });
   form.addEventListener("submit", (e) => e.preventDefault());
   const add = document.getElementById("practice-add");
   if (add) {
@@ -375,7 +389,8 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   const date = new URLSearchParams((location.hash.split("?")[1] || "")).get("date");
   const card = date && document.querySelector(`article.day[data-date="${date}"]`);
   if (card) {
-    card.classList.add("focus");
+    const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
+    if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, false);
     card.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }

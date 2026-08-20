@@ -310,7 +310,18 @@ app.get("/api/contacts", requireTeam, async (_req, res) => {
   res.json(await readJson("contacts.json"));
 });
 
-const JOIN_POS = ["P", "2B", "SS", "LF", "CF", "RF", "Util"];
+const JOIN_POS = ["P", "2B", "SS", "IF", "LF", "CF", "RF", "OF", "Util"];
+
+app.put("/api/roster/:id/positions", requireAdmin, async (req, res) => {
+  const { roster, map } = await rosterById();
+  const player = map[req.params.id];
+  if (!player) return res.status(404).json({ error: "Unknown player" });
+  const raw = Array.isArray(req.body && req.body.positions) ? req.body.positions.map(String) : [];
+  const seen = new Set();
+  player.positions = raw.filter((p) => JOIN_POS.includes(p) && !seen.has(p) && seen.add(p));
+  await writeJson("roster.json", roster);
+  res.json(roster);
+});
 
 function parseRecruit(body, requirePhone) {
   const firstName = String((body && body.firstName) || "").trim().slice(0, 40);

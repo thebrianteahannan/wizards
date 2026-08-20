@@ -382,3 +382,30 @@ function tallySlot(avail, day, windowId) {
   }
   return { yes, maybe, names };
 }
+
+function renderTeamHub() {
+  const cards = [
+    ["#/board", "◉", "Announcements", "Board notes for the club."],
+    ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no."],
+    ["#/gear", "✦", "Gear", "Jersey number and size."],
+    ["#/join", "+", "Recruit", "Put someone in the book."],
+    ["#/recruits", "☰", "Recruits", "Inbox, contact, move onto the roster."],
+    ["#/dues", "$", "Dues", "Who paid and what they owe."],
+    ["#/strategy", "◈", "Strategy", "Team-only talk."],
+  ]
+    .map(
+      ([href, icon, title, blurb]) => `
+      <a class="card feature" href="${href}">
+        <span class="icon">${icon}</span>
+        <h3>${title}</h3>
+        <p class="muted">${blurb}</p>
+      </a>`
+    )
+    .join("");
+  return `
+    <p class="kicker">Locker room</p>
+    <h1>Private Team</h1>
+    <p class="lede">Announcements, practice, gear, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
+    <section class="grid-3" style="margin-top:1.2rem">${cards}</section>
+  `;
+}

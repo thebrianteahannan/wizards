@@ -1,4 +1,4 @@
-const JOIN_POS = ["P", "2B", "SS", "LF", "CF", "RF", "Util"];
+const JOIN_POS = ["P", "2B", "SS", "IF", "LF", "CF", "RF", "OF", "Util"];
 
 function posOptions(selected) {
   return JOIN_POS.map((p) => `<option value="${p}" ${p === selected ? "selected" : ""}>${p}</option>`).join("");

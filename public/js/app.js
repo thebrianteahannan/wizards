@@ -16,6 +16,7 @@ const routes = {
   "/login": "login",
   "/join": "join",
   "/recruits": "recruits",
+  "/team": "team",
 };
 
 async function load() {
@@ -23,9 +24,11 @@ async function load() {
   const hash = (location.hash.replace(/^#/, "") || "/").split("?")[0];
   const route = routes[hash] || "home";
   syncGates();
+  const teamPages = ["team", "board", "practice", "gear", "join", "recruits", "dues", "strategy"];
   document.querySelectorAll(".nav a").forEach((a) => {
     const href = a.getAttribute("href");
-    a.classList.toggle("active", (route === "home" && href === "#/") || href === "#/" + route);
+    const onTeam = href === "#/team" && teamPages.includes(route);
+    a.classList.toggle("active", (route === "home" && href === "#/") || href === "#/" + route || onTeam);
   });
 
   const app = document.getElementById("app");
@@ -136,6 +139,13 @@ async function load() {
       bindLogin();
     } else if (route === "league") {
       app.innerHTML = renderLeague();
+    } else if (route === "team") {
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        app.innerHTML = renderTeamHub();
+      }
     } else if (route === "join") {
       app.innerHTML = renderJoin();
       bindJoin();
