@@ -3,6 +3,7 @@ const express = require("express");
 const { init, readJson, writeJson, status } = require("./store");
 const { attachAuth, requireTeam, requireAdmin, resolvePlayer } = require("./accounts");
 const { attachRecruitActions } = require("./recruit-actions");
+const { getPlwStats } = require("./plw-stats");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -311,6 +312,26 @@ app.get("/api/contacts", requireTeam, async (_req, res) => {
 });
 
 const JOIN_POS = ["P", "2B", "SS", "IF", "LF", "CF", "RF", "OF", "Util"];
+
+app.get("/api/plw-stats", async (_req, res) => {
+  try {
+    const roster = await readJson("roster.json");
+    res.json(await getPlwStats(roster.players));
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err), batters: [], pitchers: [] });
+  }
+});
+
+app.put("/api/roster/batting", requireAdmin, async (req, res) => {
+  const roster = await readJson("roster.json");
+  const known = new Set(roster.players.map((p) => p.id));
+  const raw = Array.isArray(req.body && req.body.battingOrder) ? req.body.battingOrder.map(String) : null;
+  const pits = Array.isArray(req.body && req.body.pitchingOrder) ? req.body.pitchingOrder.map(String) : null;
+  if (raw) roster.battingOrder = raw.filter((id) => known.has(id));
+  if (pits) roster.pitchingOrder = pits.filter((id) => known.has(id));
+  await writeJson("roster.json", roster);
+  res.json(roster);
+});
 
 app.put("/api/roster/:id/positions", requireAdmin, async (req, res) => {
   const { roster, map } = await rosterById();

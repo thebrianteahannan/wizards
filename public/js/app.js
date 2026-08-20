@@ -24,7 +24,7 @@ async function load() {
   const hash = (location.hash.replace(/^#/, "") || "/").split("?")[0];
   const route = routes[hash] || "home";
   syncGates();
-  const teamPages = ["team", "board", "practice", "gear", "join", "recruits", "dues", "strategy"];
+  const teamPages = ["team", "board", "availability", "tournament", "practice", "gear", "join", "recruits", "dues", "strategy"];
   document.querySelectorAll(".nav a").forEach((a) => {
     const href = a.getAttribute("href");
     const onTeam = href === "#/team" && teamPages.includes(route);

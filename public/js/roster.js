@@ -360,6 +360,8 @@ function renderRoster(roster, squad, leagueAvail, tourneyAvail) {
     <p class="lede">One Wizards book. League and Tournament only change which dates light up on the diamond. Co-managers: Tony Kurtanick and Brian Hannan.</p>
     ${isTeam() ? `<div class="actions" style="margin:0.7rem 0 0"><button class="btn ghost" type="button" id="show-phones">Phone numbers</button></div><div id="phone-list" class="card phone-list" hidden></div>` : ""}
     ${renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, "dg-roster", "h1")}
+    <div id="offense-host"></div>
+    <div id="pitching-host"></div>
   `;
 }
 
@@ -416,4 +418,5 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
     });
   });
   bindPhones(roster);
+  if (typeof loadOffense === "function") loadOffense(roster);
 }

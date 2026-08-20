@@ -386,6 +386,8 @@ function tallySlot(avail, day, windowId) {
 function renderTeamHub() {
   const cards = [
     ["#/board", "◉", "Announcements", "Board notes for the club."],
+    ["#/availability", "◷", "League", "Mark nights. Need 6 yes at the same time."],
+    ["#/tournament", "✸", "Tournament", "Who can play each tournament date."],
     ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no."],
     ["#/gear", "✦", "Gear", "Jersey number and size."],
     ["#/join", "+", "Recruit", "Put someone in the book."],
@@ -405,7 +407,7 @@ function renderTeamHub() {
   return `
     <p class="kicker">Locker room</p>
     <h1>Private Team</h1>
-    <p class="lede">Announcements, practice, gear, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
+    <p class="lede">League, tournament, practice, gear, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
     <section class="grid-3" style="margin-top:1.2rem">${cards}</section>
   `;
 }
