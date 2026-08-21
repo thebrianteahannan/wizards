@@ -17,6 +17,9 @@ const routes = {
   "/join": "join",
   "/recruits": "recruits",
   "/team": "team",
+  "/scout": "scout",
+  "/tourney-scout": "tourney-scout",
+  "/overview": "overview",
 };
 
 async function load() {
@@ -24,7 +27,7 @@ async function load() {
   const hash = (location.hash.replace(/^#/, "") || "/").split("?")[0];
   const route = routes[hash] || "home";
   syncGates();
-  const teamPages = ["team", "board", "availability", "tournament", "practice", "gear", "join", "recruits", "dues", "strategy"];
+  const teamPages = ["team", "board", "availability", "tournament", "scout", "tourney-scout", "overview", "practice", "gear", "join", "recruits", "dues", "strategy"];
   document.querySelectorAll(".nav a").forEach((a) => {
     const href = a.getAttribute("href");
     const onTeam = href === "#/team" && teamPages.includes(route);
@@ -54,13 +57,14 @@ async function load() {
       app.innerHTML = renderRoster(roster, localStorage.getItem("wizardsRosterSquad"), leagueAvail, tourneyAvail);
       bindRoster(roster, leagueAvail, tourneyAvail);
     } else if (route === "schedule") {
-      const [schedule, leagueAvail, tourneyAvail, practiceAvail] = await Promise.all([
+      const [schedule, leagueAvail, tourneyAvail, practiceAvail, book] = await Promise.all([
         api.get("/api/schedule"),
         api.get("/api/availability?kind=league"),
         api.get("/api/availability?kind=tournament"),
         api.get("/api/availability?kind=practice"),
+        isTeam() ? api.get("/api/plw-league").catch(() => ({ teams: [] })) : Promise.resolve({ teams: [] }),
       ]);
-      const packs = { league: leagueAvail, tournament: tourneyAvail, practice: practiceAvail };
+      const packs = { league: leagueAvail, tournament: tourneyAvail, practice: practiceAvail, book: (book && book.teams) || [] };
       app.innerHTML = renderSchedule(schedule, leagueAvail, null, null, packs);
       bindSchedule(schedule, leagueAvail, packs);
     } else if (route === "availability" || route === "tournament" || route === "practice") {
@@ -146,6 +150,29 @@ async function load() {
       } else {
         app.innerHTML = renderTeamHub();
       }
+    } else if (route === "scout") {
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        const data = await api.get("/api/plw-league");
+        const team = new URLSearchParams(location.hash.split("?")[1] || "").get("team");
+        app.innerHTML = renderScout(data, team);
+        bindScout();
+      }
+    } else if (route === "tourney-scout") {
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        const data = await api.get("/api/plw-tourney");
+        const team = new URLSearchParams(location.hash.split("?")[1] || "").get("team");
+        app.innerHTML = renderTourneyScout(data, team);
+        bindTourneyScout();
+      }
+    } else if (route === "overview") {
+      location.hash = "#/scout";
+      return;
     } else if (route === "join") {
       app.innerHTML = renderJoin();
       bindJoin();

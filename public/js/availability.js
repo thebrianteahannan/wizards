@@ -61,6 +61,16 @@ function windowsForOffer(offer, fallback) {
   return times.map((label) => ({ id: slugTime(label), label, hint: label }));
 }
 
+function availChips(slot, dayAll) {
+  const inSlot = new Set([...(slot.yes || []), ...(slot.maybe || [])]);
+  return [
+    ...(slot.yes || []).map((n) => `<span class="chip yes">${escapeHtml(n)}</span>`),
+    ...(slot.maybe || []).map((n) => `<span class="chip maybe">${escapeHtml(n)}?</span>`),
+    ...(dayAll.yes || []).filter((n) => !inSlot.has(n)).map((n) => `<span class="chip">${escapeHtml(n)}</span>`),
+    ...(dayAll.maybe || []).filter((n) => !inSlot.has(n)).map((n) => `<span class="chip">${escapeHtml(n)}?</span>`),
+  ].join("");
+}
+
 function lockLabel(day) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
     return new Date(day + "T12:00:00").toLocaleDateString("en-US", {
@@ -91,6 +101,14 @@ async function renderAvailability(roster, avail, playerId, kind) {
   const needed = avail.needed || 6;
 
   const offers = [...(avail.offers || [])].sort((a, b) => String(a.date || a.day).localeCompare(String(b.date || b.day)));
+  let book = [];
+  if (page.kind === "league") {
+    try {
+      book = ((await api.get("/api/plw-league")) || {}).teams || [];
+    } catch (err) {
+      book = [];
+    }
+  }
   const dayCols = offers.map((offer) => {
     const day = offerKey(offer, page.kind);
     const when = new Date((offer.date || "") + "T12:00:00");
@@ -104,19 +122,11 @@ async function renderAvailability(roster, avail, playerId, kind) {
     const best = byWindow.reduce((a, b) => (b.t.yes > a.t.yes ? b : a), byWindow[0] || { t: { yes: 0, maybe: 0, names: { yes: [], maybe: [] } } });
     const go = best.t.yes >= needed;
     const close = !go && best.t.yes + best.t.maybe >= needed;
-    const names = { yes: new Set(), maybe: new Set() };
-    for (const row of byWindow) {
-      row.t.names.yes.forEach((n) => names.yes.add(n));
-      row.t.names.maybe.forEach((n) => names.maybe.add(n));
-    }
-    const chips = [
-      ...[...names.yes].map((n) => `<span class="chip yes">${escapeHtml(n)}</span>`),
-      ...[...names.maybe].map((n) => `<span class="chip maybe">${escapeHtml(n)}?</span>`),
-    ].join("");
+    const chips = availChips(best.t ? best.t.names : { yes: [], maybe: [] }, tallySlot(avail, day).names);
     const counts = byWindow
       .map((row) => {
         const on = best.w && row.w.id === best.w.id ? "on" : "";
-        return `<span class="win-count ${on} ${row.t.yes >= needed ? "go" : ""}">${escapeHtml(/^t-/.test(row.w.id) ? row.w.hint : row.w.label[0])}<b>${row.t.yes}</b>${row.t.maybe ? `<i>+${row.t.maybe}</i>` : ""}</span>`;
+        return `<span class="win-count ${on} ${row.t.yes >= needed ? "go" : ""}" data-window="${escapeHtml(row.w.id)}">${escapeHtml(/^t-/.test(row.w.id) ? row.w.hint : row.w.label[0])}<b>${row.t.yes}</b>${row.t.maybe ? `<i>+${row.t.maybe}</i>` : ""}</span>`;
       })
       .join("");
     const segs = ["yes", "maybe", "no"]
@@ -129,9 +139,14 @@ async function renderAvailability(roster, avail, playerId, kind) {
       isManager && go
         ? `<button class="btn" data-lock="${day}" data-window="${best.w.id}" type="button">Lock</button>`
         : "";
+    const fav = page.kind === "league" && typeof matchupFavor === "function" ? matchupFavor(offer, book) : null;
+    const favHtml =
+      fav == null
+        ? ""
+        : `<span class="num" title="Matchup favorability" style="margin-left:auto;letter-spacing:0;text-align:right;line-height:1.05"><small class="muted" style="display:block;font-size:0.55rem;font-family:var(--sans,inherit)">${typeof favorWord === "function" ? escapeHtml(favorWord(fav)) : ""}</small><b style="font-family:var(--display);font-size:1.15rem;${ratingTone(fav)}">${fav}</b></span>`;
     return `
       <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}" style="cursor:pointer">
-        <h3>${num ? `<span class="day-num">${num}</span>` : ""}${label}</h3>
+        <h3>${num ? `<span class="day-num">${num}</span>` : ""}${label}${favHtml}</h3>
         <p class="day-note">${escapeHtml(offer.note)}</p>
         <div class="win-line">${counts}</div>
         <div class="seg">${segs}</div>
@@ -189,6 +204,39 @@ async function renderAvailability(roster, avail, playerId, kind) {
   `;
 }
 
+function liveTally(avail, day, windowId, myId, myName, myStatus, myWindows) {
+  let yes = 0;
+  let maybe = 0;
+  const names = { yes: [], maybe: [] };
+  const seen = new Set();
+  for (const [id, p] of Object.entries((avail && avail.players) || {})) {
+    const mine = id === myId;
+    const entry = (p.days || {})[day] || {};
+    const status = mine ? myStatus : entry.status;
+    const windows = mine ? myWindows : entry.windows || [];
+    const inWindow = !windowId || windows.includes(windowId) || windows.length === 0;
+    seen.add(id);
+    if (status === "yes" && inWindow) {
+      yes += 1;
+      names.yes.push(p.name || id);
+    } else if (status === "maybe" && inWindow) {
+      maybe += 1;
+      names.maybe.push(p.name || id);
+    }
+  }
+  if (myId && !seen.has(myId) && myName) {
+    const inWindow = !windowId || myWindows.includes(windowId) || myWindows.length === 0;
+    if (myStatus === "yes" && inWindow) {
+      yes += 1;
+      names.yes.push(myName);
+    } else if (myStatus === "maybe" && inWindow) {
+      maybe += 1;
+      names.maybe.push(myName);
+    }
+  }
+  return { yes, maybe, names };
+}
+
 function paintLiveDay(card, avail, roster) {
   const day = card.dataset.day;
   card.querySelectorAll(".seg label").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
@@ -201,21 +249,22 @@ function paintLiveDay(card, avail, roster) {
   }
   const myId = sessionPlayerId(roster.players);
   const myName = sessionPlayerName(roster.players);
-  const names = { yes: new Set(), maybe: new Set() };
-  for (const [id, p] of Object.entries((avail && avail.players) || {})) {
-    if (id === myId) continue;
-    const entry = (p.days || {})[day] || {};
-    if (entry.status === "yes") names.yes.add(p.name || id);
-    else if (entry.status === "maybe") names.maybe.add(p.name || id);
-  }
-  if (status === "yes" && myName) names.yes.add(myName);
-  else if (status === "maybe" && myName) names.maybe.add(myName);
-  const chips = [...names.yes]
-    .map((n) => `<span class="chip yes">${escapeHtml(n)}</span>`)
-    .concat([...names.maybe].map((n) => `<span class="chip maybe">${escapeHtml(n)}?</span>`))
-    .join("");
+  const myWindows = boxes.filter((b) => b.checked).map((b) => b.value);
+  card.querySelectorAll(".win-count").forEach((el) => {
+    const t = liveTally(avail, day, el.dataset.window, myId, myName, status, myWindows);
+    const b = el.querySelector("b");
+    const extra = el.querySelector("i");
+    if (b) b.textContent = t.yes;
+    if (t.maybe) {
+      if (extra) extra.textContent = "+" + t.maybe;
+      else el.insertAdjacentHTML("beforeend", `<i>+${t.maybe}</i>`);
+    } else if (extra) extra.remove();
+  });
+  const on = card.querySelector(".win-count.on");
+  const slot = liveTally(avail, day, on ? on.dataset.window : "", myId, myName, status, myWindows);
+  const dayAll = liveTally(avail, day, "", myId, myName, status, myWindows);
   const el = card.querySelector(".chips");
-  if (el) el.innerHTML = chips || '<span class="muted">Empty</span>';
+  if (el) el.innerHTML = availChips(slot.names, dayAll.names) || '<span class="muted">Empty</span>';
 }
 
 function firstWindowOffer(avail) {
@@ -341,6 +390,13 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   });
   form.querySelectorAll("article.day").forEach((card) => paintLiveDay(card, avail, roster));
   form.addEventListener("click", (e) => {
+    const win = e.target.closest(".win-count");
+    if (win) {
+      const card = win.closest("article.day");
+      card.querySelectorAll(".win-count").forEach((el) => el.classList.toggle("on", el === win));
+      paintLiveDay(card, avail, roster);
+      return;
+    }
     if (e.target.closest("input, label, button, a, select")) return;
     const card = e.target.closest("article.day");
     if (!card) return;

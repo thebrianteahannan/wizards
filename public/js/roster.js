@@ -1,5 +1,10 @@
-function onSquad(_p, _squad) {
-  return true;
+function playerSquads(p) {
+  const s = p && p.squads;
+  return s && s.length ? s.slice() : ["league", "tournament"];
+}
+
+function onSquad(p, squad) {
+  return playerSquads(p).includes(squad);
 }
 
 function nextProposed(avail) {
@@ -26,19 +31,28 @@ function playerMark(avail, playerId, offer, kind) {
   return entry.status === "yes" || entry.status === "maybe" ? entry.status : "";
 }
 
-function rosterRows(players) {
+function rosterRows(players, squad) {
   return players
     .map((p) => {
       const pos = (p.positions || []).join(", ") || "Util";
+      const inBook = onSquad(p, squad);
       const tag = isAdmin()
         ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit">${escapeHtml(pos)}</button>`
         : `<span class="tag">${escapeHtml(pos)}</span>`;
+      const last = isAdmin()
+        ? `<span>${["league", "tournament"]
+            .map((book) => {
+              const on = onSquad(p, book);
+              return `<button type="button" class="btn ghost" data-squad-set="${escapeHtml(p.id)}" data-book="${book}" style="padding:0.08rem 0.32rem;font-size:0.62rem;margin-left:0.15rem${on ? "" : ";opacity:0.4"}">${book === "league" ? "L" : "T"}</button>`;
+            })
+            .join("")}</span>`
+        : `<span class="muted">${inBook ? (p.born ? escapeHtml(p.born) : "") : squad === "league" ? "Not league" : "Not tourney"}</span>`;
       return `
-        <div class="roster-row">
+        <div class="roster-row" style="${inBook ? "" : "opacity:0.55"}">
           <strong>${escapeHtml(p.name)}</strong>
           <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
           ${tag}
-          <span class="muted">${p.born ? escapeHtml(p.born) : ""}</span>
+          ${last}
         </div>`;
     })
     .join("");
@@ -272,11 +286,13 @@ function renderNightDiamond(roster, avail, offer, day, kind, liveStatus) {
     .join("");
   return `
     <div id="avail-diamond" data-day="${escapeHtml(day)}">
+      <div id="night-scout-host"></div>
       <p class="muted" style="margin:1rem 0 0.4rem">Yes and maybe for this date. Empty spots still need a body.</p>
       <div class="roster-layout">
         ${rosterDiamond(players, "dg-avail", marks, offer, pitcherId)}
-        <div class="roster-list">${rows || '<p class="muted">Nobody marked yes or maybe yet.</p>'}</div>
+        <div class="roster-list" id="night-lineup-list">${rows || '<p class="muted">Nobody marked yes or maybe yet.</p>'}</div>
       </div>
+      <div id="night-opp-host"></div>
     </div>`;
 }
 
@@ -317,22 +333,27 @@ function paintAvailDiamond(card, roster, avail, kind, offer, toggle) {
   const live = (card.querySelector(`input[name="st-${day}"]:checked`) || {}).value || "";
   show(renderNightDiamond(roster, avail, offer, day, kind, live));
   bindNightDiamond(roster, avail, kind, offer);
+  const { players, marks } = nightMarks(roster, avail, day, live);
+  if (kind !== "practice" && typeof paintNightLineup === "function") paintNightLineup(players, marks);
+  if (kind === "league" && typeof loadNightMatchup === "function") {
+    loadNightMatchup(offer, players.filter((p) => marks[p.id] === "yes").map((p) => p.name));
+  }
 }
 
 function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, heading) {
   squad = squad === "tournament" ? "tournament" : "league";
-  const players = roster.players.filter((p) => onSquad(p, squad));
+  const field = roster.players.filter((p) => onSquad(p, squad));
   const leagueOn = squad === "league";
   const avail = leagueOn ? leagueAvail || {} : tourneyAvail || {};
   const offer = nextProposed(avail);
   const marks = {};
   if (offer) {
-    for (const p of players) marks[p.id] = playerMark(avail, p.id, offer, squad);
+    for (const p of field) marks[p.id] = playerMark(avail, p.id, offer, squad);
   }
-  const pitcherId = pickPitcherId(players, squad);
+  const pitcherId = pickPitcherId(field, squad);
   const blurb = leagueOn
-    ? "Florida Challengers League · need 6 to take a night · cap 12"
-    : "PLW Saturday events · Aug 1 packet and onward";
+    ? `Florida Challengers League · need 6 to take a night · ${field.length} of 12 counting`
+    : `PLW Saturday events · Aug 1 packet and onward · ${field.length} counting`;
   const title = heading === "h2" ? "h2" : "h1";
   return `
     <div id="roster-embed" data-svg="${escapeHtml(svgId || "dg-roster")}" data-book="${escapeHtml(squad)}">
@@ -348,8 +369,8 @@ function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, head
       </div>
       <p class="muted">${blurb}</p>
       <div class="roster-layout">
-        ${rosterDiamond(players, svgId || "dg-roster", marks, offer, pitcherId)}
-        <div class="roster-list">${rosterRows(players)}</div>
+        ${rosterDiamond(field, svgId || "dg-roster", marks, offer, pitcherId)}
+        <div class="roster-list">${rosterRows(roster.players, squad)}</div>
       </div>
     </div>
   `;
@@ -384,6 +405,25 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
       const squad = (box && box.dataset.book) === "tournament" ? "tournament" : "league";
       localStorage.setItem(pitcherKey(squad), btn.dataset.pitcher);
       redraw(squad);
+    });
+  });
+  document.querySelectorAll("[data-squad-set]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const p = roster.players.find((x) => x.id === btn.dataset.squadSet);
+      if (!p) return;
+      const book = btn.dataset.book;
+      const next = playerSquads(p);
+      const i = next.indexOf(book);
+      if (i >= 0) next.splice(i, 1);
+      else next.push(book);
+      try {
+        const saved = await api.send("/api/roster/" + p.id + "/squads", "PUT", { squads: next });
+        roster.players = saved.players || roster.players;
+        const box = document.getElementById("roster-embed");
+        redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
+      } catch (err) {
+        alert(err.message);
+      }
     });
   });
   document.querySelectorAll("[data-edit-pos]").forEach((btn) => {

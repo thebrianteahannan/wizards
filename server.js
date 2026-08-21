@@ -4,6 +4,7 @@ const { init, readJson, writeJson, status } = require("./store");
 const { attachAuth, requireTeam, requireAdmin, resolvePlayer } = require("./accounts");
 const { attachRecruitActions } = require("./recruit-actions");
 const { getPlwStats } = require("./plw-stats");
+const { attachPlwLeague } = require("./plw-league");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -333,6 +334,16 @@ app.put("/api/roster/batting", requireAdmin, async (req, res) => {
   res.json(roster);
 });
 
+app.put("/api/roster/:id/squads", requireAdmin, async (req, res) => {
+  const { roster, map } = await rosterById();
+  const player = map[req.params.id];
+  if (!player) return res.status(404).json({ error: "Unknown player" });
+  const raw = Array.isArray(req.body && req.body.squads) ? req.body.squads.map(String) : [];
+  player.squads = raw.filter((s) => s === "league" || s === "tournament");
+  await writeJson("roster.json", roster);
+  res.json(roster);
+});
+
 app.put("/api/roster/:id/positions", requireAdmin, async (req, res) => {
   const { roster, map } = await rosterById();
   const player = map[req.params.id];
@@ -419,6 +430,7 @@ attachRecruitActions(app, {
   requireAdmin,
   positions: JOIN_POS,
 });
+attachPlwLeague(app, { requireTeam });
 
 const FEE_MODELS = ["flat", "split", "core", "play"];
 

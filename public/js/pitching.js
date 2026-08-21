@@ -57,7 +57,7 @@ function isArm(player, row) {
 
 function pitchLine(row) {
   if (!row) return `<span class="muted">No PLW pitching line yet</span>`;
-  return PITCH_LINE.map(([key, label]) => `<span class="tag">${label} ${escapeHtml(row[key] == null || row[key] === "" ? "—" : String(row[key]))}</span>`).join("");
+  return PITCH_LINE.map(([key, label]) => `${label} ${escapeHtml(row[key] == null || row[key] === "" ? "—" : String(row[key]))}`).join(" · ");
 }
 
 function rotationPlayers(roster, stats, customIds) {
@@ -94,19 +94,17 @@ function renderPitching(roster, stats, customIds) {
     .map((p, i) => {
       const row = pitcherRow(stats, p);
       const score = pitchRating(row);
-      const cols = admin ? "2.2rem 3.2rem minmax(0,1fr) 6.4rem" : "2.2rem 3.2rem minmax(0,1fr)";
+      const cols = admin ? "2.2rem 3.2rem 8.4rem minmax(0,1fr) 6.4rem" : "2.2rem 3.2rem 8.4rem minmax(0,1fr)";
       const move = admin
         ? `<span><button type="button" class="btn ghost" data-pit-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-pit-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
-      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${pitchTone(score)}">${score}</b>`;
+      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${pitchTone(score)}">${score}${/tourney/i.test(String((row && row.source) || "")) ? "*" : ""}</b>`;
       const hole = i === 0 ? `<small class="muted" style="display:block;font-size:0.62rem">Ace</small>` : "";
-      return `<div class="roster-row" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
+      return `<div class="roster-row" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:center">
         <span class="num">${i + 1}${hole}</span>
         <span class="num" title="Pitch rating">${grade}</span>
-        <div>
-          <strong>${escapeHtml(p.name)}</strong>
-          <div style="margin-top:0.28rem;display:flex;flex-wrap:wrap;gap:0.28rem">${pitchLine(row)}</div>
-        </div>
+        <strong>${escapeHtml(p.name)}</strong>
+        <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${pitchLine(row)}</div>
         ${move}
       </div>`;
     })

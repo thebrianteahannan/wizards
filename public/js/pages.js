@@ -130,8 +130,9 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
 function renderSchedule(schedule, avail, view, monthKey, packs) {
   view = view || localStorage.getItem("wizardsSchedView") || "calendar";
   const events = schedule.events || [];
-  const first = events[0] && events[0].date ? events[0].date.slice(0, 7) : "2026-08";
-  monthKey = monthKey || localStorage.getItem("wizardsSchedMonth") || first;
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  monthKey = monthKey || thisMonth;
   const locked = avail.lockedNight;
   const lock = locked
     ? `<div class="banner">Standing league night: <strong>${cap(locked.day)} ${escapeHtml(locked.window)}</strong> (${escapeHtml(locked.lockedBy)})</div>`
@@ -143,6 +144,7 @@ function renderSchedule(schedule, avail, view, monthKey, packs) {
         <div>
           <div class="kind">${escapeHtml(e.kind)} · ${escapeHtml(e.status)}</div>
           <h3>${escapeHtml(e.title)}</h3>
+          ${typeof schedFavorHtml === "function" ? schedFavorHtml(e, packs && packs.book) : ""}
           <p>${escapeHtml(e.when)}${e.detail ? ` <span class="muted">· ${escapeHtml(e.detail)}</span>` : ""}${e.link ? ` · <a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch</a>` : ""}</p>
         </div>
       </article>`)
@@ -387,6 +389,8 @@ function renderTeamHub() {
   const cards = [
     ["#/board", "◉", "Announcements", "Board notes for the club."],
     ["#/availability", "◷", "League", "Mark nights. Need 6 yes at the same time."],
+    ["#/scout", "▦", "League rankings", "Overview and every Challengers club."],
+    ["#/tourney-scout", "▣", "Tournament rankings", "2026 Tourney Season. Every club on that board."],
     ["#/tournament", "✸", "Tournament", "Who can play each tournament date."],
     ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no."],
     ["#/gear", "✦", "Gear", "Jersey number and size."],

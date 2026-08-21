@@ -109,6 +109,57 @@ async function getPlwStats(players) {
     row.ops = ".667";
   }
   const arms = mergeKind(pL, pT, players);
+  const wizPitch = [
+    {
+      last: "Hannan",
+      first: "Brian",
+      name: "Brian Hannan",
+      playerId: "brian-hannan",
+      g: 1,
+      w: "0",
+      l: "0",
+      sv: "0",
+      era: "5.14",
+      ip: "7.0",
+      r: "4",
+      er: "4",
+      bb: "4",
+      so: "6",
+      gs: "1",
+      whip: "0.57",
+      sox: "6.00",
+      bbx: "4.00",
+      source: "Tourney exception",
+    },
+    {
+      last: "Kurtanick",
+      first: "Tony",
+      name: "Tony Kurtanick",
+      playerId: "tony-kurtanick",
+      g: 2,
+      w: "0",
+      l: "0",
+      sv: "0",
+      era: "4.00",
+      ip: "9.0",
+      r: "4",
+      er: "4",
+      bb: "1",
+      so: "3",
+      gs: "1",
+      cg: "1",
+      whip: "0.11",
+      sox: "2.33",
+      bbx: "0.78",
+      source: "Tourney exception",
+    },
+  ];
+  for (const line of wizPitch) {
+    if (arms.rows.some((r) => r.playerId === line.playerId && parseFloat(r.ip) > 0)) continue;
+    const i = arms.rows.findIndex((r) => r.playerId === line.playerId);
+    if (i >= 0) Object.assign(arms.rows[i], line);
+    else arms.rows.push(line);
+  }
   const note = bats.usedLeague
     ? "Florida Challengers League averages."
     : "No league games posted yet — showing 2026 Tourney Season averages.";

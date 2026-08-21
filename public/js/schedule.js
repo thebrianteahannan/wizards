@@ -18,6 +18,26 @@ function eventHeadcount(e, packs) {
   return maybe ? `${yes}+${maybe}/${needed}` : `${yes}/${needed}`;
 }
 
+function schedOpponent(title) {
+  const m = String(title || "").match(/(.+?)\s+vs\.?\s+(.+)/i);
+  if (!m) return "";
+  const a = m[1].trim();
+  const b = m[2].split(/[·|,]/)[0].trim();
+  if (/^wizards?$/i.test(a)) return b;
+  if (/^wizards?$/i.test(b)) return a;
+  return b;
+}
+
+function schedFavorHtml(e, book) {
+  if (!isTeam() || typeof matchupFavor !== "function") return "";
+  const name = schedOpponent(e && e.title);
+  if (!name) return "";
+  const fav = matchupFavor({ note: "vs " + name }, book);
+  if (fav == null) return "";
+  const word = typeof favorWord === "function" ? favorWord(fav) : "";
+  return `<span class="num" title="Matchup favorability" style="display:block;margin-top:0.12rem;line-height:1.05;text-align:left"><small class="muted" style="display:block;font-size:0.55rem">${escapeHtml(word)}</small><b style="font-size:1.05rem;${ratingTone(fav)}">${fav}</b></span>`;
+}
+
 function calPillBits(e, packs) {
   const title = escapeHtml(e.title);
   return {
@@ -62,8 +82,9 @@ function renderCalendarMonth(events, monthKey, packs) {
   for (let d = 1; d <= daysInMonth; d += 1) {
     const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const hits = byDay[iso] || [];
+    const book = packs && packs.book;
     const tags = calDayTags(hits, packs);
-    const pills = hits.map((e) => calPill(e, packs)).join("");
+    const pills = hits.map((e) => calPill(e, packs) + schedFavorHtml(e, book)).join("");
     const todayOn = iso === today;
     const dayN = todayOn ? `${d} · Today` : String(d);
     const todayLook = todayOn
@@ -75,7 +96,7 @@ function renderCalendarMonth(events, monthKey, packs) {
       const p = calPillBits(e, packs);
       const href = `#/${p.path}?date=${escapeHtml(e.date)}`;
       cells.push(
-        `<a class="cal-cell has" href="${href}" style="color:inherit;text-decoration:none;cursor:pointer;${todayLook}"><span class="cal-n"${numStyle}>${dayN}</span>${tags}<span class="${p.cls}" title="${p.title}">${p.title}</span></a>`
+        `<a class="cal-cell has" href="${href}" style="color:inherit;text-decoration:none;cursor:pointer;${todayLook}"><span class="cal-n"${numStyle}>${dayN}</span>${tags}<span class="${p.cls}" title="${p.title}">${p.title}</span>${schedFavorHtml(e, packs && packs.book)}</a>`
       );
     } else {
       const extra = todayLook ? ` style="${todayLook}"` : "";

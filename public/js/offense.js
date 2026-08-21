@@ -54,9 +54,23 @@ function classicBattingOrder(roster, stats) {
   return [lead, two, three, cleanup, five, ...rest].filter(Boolean);
 }
 
-function lineupPlayers(roster, stats, customIds) {
-  if (customIds && customIds.length) return lineupFromIds(roster, customIds);
-  return classicBattingOrder(roster, stats);
+function ratingOrder(roster, stats) {
+  return roster.players.slice().sort((a, b) => {
+    const ra = hitterRating(batterRow(stats, a));
+    const rb = hitterRating(batterRow(stats, b));
+    if (ra == null && rb == null) return a.name.localeCompare(b.name);
+    if (ra == null) return 1;
+    if (rb == null) return -1;
+    return rb - ra || a.name.localeCompare(b.name);
+  });
+}
+
+function lineupPlayers(roster, stats, customIds, mode) {
+  if (mode === "lineup") {
+    if (customIds && customIds.length) return lineupFromIds(roster, customIds);
+    return classicBattingOrder(roster, stats);
+  }
+  return ratingOrder(roster, stats);
 }
 
 const BAT_LINE = [
@@ -107,40 +121,42 @@ function ratingTone(score) {
 
 function batterLine(hit) {
   if (!hit) return `<span class="muted">No PLW line yet</span>`;
-  return BAT_LINE.map(([key, label]) => `<span class="tag">${label} ${escapeHtml(hit[key] == null || hit[key] === "" ? "—" : String(hit[key]))}</span>`).join("");
+  return BAT_LINE.map(([key, label]) => `${label} ${escapeHtml(hit[key] == null || hit[key] === "" ? "—" : String(hit[key]))}`).join(" · ");
 }
 
 const HOLE = ["Lead", "2", "3", "Cleanup", "5"];
 
-function renderOffense(roster, stats, customIds) {
-  const admin = isAdmin();
-  const rows = lineupPlayers(roster, stats, customIds)
+function renderOffense(roster, stats, customIds, mode) {
+  const lineup = mode === "lineup";
+  const admin = lineup && isAdmin();
+  const rows = lineupPlayers(roster, stats, customIds, mode)
     .map((p, i) => {
       const hit = batterRow(stats, p);
       const score = hitterRating(hit);
-      const cols = admin ? "2.2rem 3.2rem minmax(0,1fr) 6.4rem" : "2.2rem 3.2rem minmax(0,1fr)";
+      const cols = admin ? "2.2rem 3.2rem 8.4rem minmax(0,1fr) 6.4rem" : "2.2rem 3.2rem 8.4rem minmax(0,1fr)";
       const move = admin
         ? `<span><button type="button" class="btn ghost" data-bat-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-bat-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
-      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(score)}">${score}</b>`;
-      const hole = HOLE[i] ? `<small class="muted" style="display:block;font-size:0.62rem">${HOLE[i]}</small>` : "";
-      return `<div class="roster-row" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
+      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(score)}">${score}${/tourney/i.test(String((hit && hit.source) || "")) ? "*" : ""}</b>`;
+      const hole = lineup && HOLE[i] ? `<small class="muted" style="display:block;font-size:0.62rem">${HOLE[i]}</small>` : "";
+      return `<div class="roster-row" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:center">
         <span class="num">${i + 1}${hole}</span>
         <span class="num" title="Hit rating">${grade}</span>
-        <div>
-          <strong>${escapeHtml(p.name)}</strong>
-          <div style="margin-top:0.28rem;display:flex;flex-wrap:wrap;gap:0.28rem">${batterLine(hit)}</div>
-        </div>
+        <strong>${escapeHtml(p.name)}</strong>
+        <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${batterLine(hit)}</div>
         ${move}
       </div>`;
     })
     .join("");
   const href = (stats && stats.source) || "https://www.mystatsonline.com/ballsports/visitor/league/home/home.aspx?IDLeague=61713";
+  const blurb = lineup
+    ? "Stacked like a baseball card: 1 gets on, 2 puts the ball in play, 3 is the best bat, 4 is cleanup power, 5 is the next RBI bat, then hit rating."
+    : "Sorted by hit rating, high to low.";
   return `
     <div id="offense-card" class="diamond-card card" style="margin-top:1rem">
       <p class="kicker">Offense</p>
-      <h2 style="margin:0 0 0.35rem">Batting order</h2>
-      <p class="muted">${escapeHtml((stats && stats.note) || "Averages from PLW.")} Stacked like a baseball card: 1 gets on, 2 puts the ball in play, 3 is the best bat, 4 is cleanup power, 5 is the next RBI bat, then hit rating. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+      <h2 style="margin:0 0 0.35rem">${lineup ? "Batting order" : "Hitting"}</h2>
+      <p class="muted">${escapeHtml((stats && stats.note) || "Averages from PLW.")} ${blurb} <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
       <div class="roster-list" style="margin-top:0.6rem">${rows}</div>
       ${admin ? '<p class="muted" id="bat-msg" style="margin:0.45rem 0 0">↑ ↓ saves the order.</p>' : ""}
     </div>`;
@@ -154,7 +170,7 @@ function bindOffense(roster, stats) {
       roster.battingOrder = next.battingOrder;
       roster.players = next.players || roster.players;
       const host = document.getElementById("offense-card");
-      if (host) host.outerHTML = renderOffense(roster, stats, next.battingOrder || ids);
+      if (host) host.outerHTML = renderOffense(roster, stats, next.battingOrder || ids, "lineup");
       bindOffense(roster, stats);
     } catch (err) {
       if (msg) msg.textContent = err.message;
@@ -187,20 +203,77 @@ function bindOffense(roster, stats) {
   });
 }
 
-async function loadOffense(roster) {
-  const host = document.getElementById("offense-host");
+async function loadOffense(roster, opts) {
+  const hostId = (opts && opts.host) || "offense-host";
+  const mode = (opts && opts.mode) || "rating";
+  const host = document.getElementById(hostId);
   if (!host) return;
   host.innerHTML = `<div class="diamond-card card" style="margin-top:1rem"><p class="kicker">Offense</p><p class="muted">Loading PLW averages…</p></div>`;
   try {
     const stats = await api.get("/api/plw-stats");
-    host.innerHTML = renderOffense(roster, stats);
-    bindOffense(roster, stats);
+    host.innerHTML = renderOffense(roster, stats, mode === "lineup" ? roster.battingOrder : null, mode);
+    if (mode === "lineup") bindOffense(roster, stats);
     const pit = document.getElementById("pitching-host");
-    if (pit && typeof renderPitching === "function") {
+    if (hostId === "offense-host" && pit && typeof renderPitching === "function") {
       pit.innerHTML = renderPitching(roster, stats, roster.pitchingOrder);
       bindPitching(roster, stats);
     }
   } catch (err) {
     host.innerHTML = `<div class="diamond-card card" style="margin-top:1rem"><p class="kicker">Offense</p><p class="muted">${escapeHtml(err.message || "Could not load PLW averages.")}</p></div>`;
   }
+}
+
+function nightGrade(n, title, star) {
+  return n == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(n)}" title="${title}">${n}${star ? "*" : ""}</b>`;
+}
+
+function nightPlayerRow(p, marks, hole, bat, pit, batStar, pitStar) {
+  const pos = (p.positions || []).join(", ") || "Util";
+  const holeHtml = hole ? `<small class="muted" style="display:block;font-size:0.62rem">${escapeHtml(hole)}</small>` : "";
+  return `<div class="roster-row" style="grid-template-columns:4.6rem 2.4rem 2.4rem minmax(0,1fr) 2.8rem 4.4rem 3.2rem">
+    <span class="num">${holeHtml}</span>
+    <span class="num">${nightGrade(bat, "Hit rating", batStar)}</span>
+    <span class="num">${nightGrade(pit, "Pitch rating", pitStar)}</span>
+    <strong>${escapeHtml(p.name)}</strong>
+    <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
+    <span class="tag">${escapeHtml(pos)}</span>
+    <span class="muted">${marks[p.id] === "maybe" ? "maybe" : "yes"}</span>
+  </div>`;
+}
+
+async function paintNightLineup(players, marks) {
+  const list = document.getElementById("night-lineup-list");
+  if (!list || !players.length) return;
+  try {
+    const stats = await api.get("/api/plw-stats");
+    const ranked = players.slice().sort((a, b) => {
+      const ya = marks[a.id] === "yes" ? 1 : 0;
+      const yb = marks[b.id] === "yes" ? 1 : 0;
+      if (yb !== ya) return yb - ya;
+      const ra = hitterRating(batterRow(stats, a));
+      const rb = hitterRating(batterRow(stats, b));
+      if (ra == null && rb == null) return a.name.localeCompare(b.name);
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      return rb - ra;
+    });
+    const starters = ranked.slice(0, 6);
+    const bench = ranked.slice(6);
+    const ordered = classicBattingOrder({ players: starters }, stats);
+    const holes = ["Lead", "2", "3", "Cleanup", "5", "6"];
+    const cols = "4.6rem 2.4rem 2.4rem minmax(0,1fr) 2.8rem 4.4rem 3.2rem";
+    const rowOf = (p, hole) => {
+      const hit = batterRow(stats, p);
+      const arm = typeof pitcherRow === "function" ? pitcherRow(stats, p) : null;
+      const fromTourney = (row) => /tourney/i.test(String((row && row.source) || ""));
+      return nightPlayerRow(p, marks, hole, hitterRating(hit), typeof pitchRating === "function" ? pitchRating(arm) : null, fromTourney(hit), fromTourney(arm));
+    };
+    let html = `<div class="roster-row" style="grid-template-columns:${cols}"><span></span><span class="num muted" style="font-size:0.62rem">BAT</span><span class="num muted" style="font-size:0.62rem">PIT</span><span></span><span></span><span></span><span></span></div>`;
+    html += ordered.map((p, i) => rowOf(p, holes[i] || String(i + 1))).join("");
+    if (bench.length) {
+      html += `<div style="border-top:1px solid var(--line);margin:0.55rem 0 0.4rem"></div><p class="kicker" style="margin:0 0 0.3rem">Bench</p>`;
+      html += bench.map((p) => rowOf(p, "")).join("");
+    }
+    list.innerHTML = html;
+  } catch (err) {}
 }
