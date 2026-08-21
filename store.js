@@ -16,6 +16,7 @@ const FILES = [
   "activity.json",
   "accounts.json",
   "strategy.json",
+  "lineups.json",
 ];
 
 let url = "";
@@ -122,6 +123,7 @@ async function readJson(file) {
     }
     if (file === "activity.json") return { entries: [] };
     if (file === "accounts.json") return { users: [], sessions: [], resets: [], inviteCode: "" };
+    if (file === "lineups.json") return { nights: {} };
     throw new Error("Missing data: " + file);
   }
   try {
@@ -129,6 +131,7 @@ async function readJson(file) {
   } catch (err) {
     if (file === "activity.json") return { entries: [] };
     if (file === "accounts.json") return { users: [], sessions: [], resets: [], inviteCode: "" };
+    if (file === "lineups.json") return { nights: {} };
     throw err;
   }
 }

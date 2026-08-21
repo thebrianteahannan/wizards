@@ -153,6 +153,8 @@ async function getPlwStats(players) {
       bbx: "0.78",
       source: "Tourney exception",
     },
+    { last: "Gonzalez", first: "Jose", name: "Jose Gonzalez", playerId: "jose-gonzalez", source: "Staff" },
+    { last: "Dupe", first: "Cam", name: "Cam Dupe", playerId: "cam", source: "Staff" },
   ];
   for (const line of wizPitch) {
     if (arms.rows.some((r) => r.playerId === line.playerId && parseFloat(r.ip) > 0)) continue;
@@ -163,11 +165,11 @@ async function getPlwStats(players) {
   const note = bats.usedLeague
     ? "Florida Challengers League averages."
     : "No league games posted yet — showing 2026 Tourney Season averages.";
-  const pitchNote = arms.rows.length
+  const pitchNote = (arms.rows.length
     ? arms.usedLeague
       ? "Florida Challengers League pitching."
       : "No league pitching posted yet — showing 2026 Tourney Season."
-    : "PLW has no Wizard pitching lines posted yet.";
+    : "PLW has no Wizard pitching lines posted yet.") + " Jose and Cam are on the staff — no IP posted yet.";
   cache = {
     at: Date.now(),
     data: {

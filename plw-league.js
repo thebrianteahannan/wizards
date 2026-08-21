@@ -109,6 +109,11 @@ function creditBrianPitch(rows) {
   });
 }
 
+function creditKnownPitch(rows) {
+  creditWizPitch(rows, { last: "Gonzalez", first: "Jose", team: "WIZ", name: "Jose Gonzalez", playerId: "jose-gonzalez" });
+  creditWizPitch(rows, { last: "Dupe", first: "Cam", team: "WIZ", name: "Cam Dupe", playerId: "cam" });
+}
+
 function creditTonyPitch(rows) {
   creditWizPitch(rows, {
     last: "Kurtanick",
@@ -138,6 +143,7 @@ function wizTeam(batters, pitchers, fromTourney) {
   creditBrianHit(batters);
   creditBrianPitch(pitchers);
   creditTonyPitch(pitchers);
+  creditKnownPitch(pitchers);
   return {
     code: "WIZ",
     name: "Wizards",
@@ -174,6 +180,7 @@ async function getPlwLeagueBook() {
   if (wiz) {
     creditBrianPitch(wiz.pitchers);
     creditTonyPitch(wiz.pitchers);
+    creditKnownPitch(wiz.pitchers);
   }
   cache = {
     at: Date.now(),
@@ -200,6 +207,7 @@ async function getPlwTourneyBook() {
       creditBrianHit(t.batters);
       creditBrianPitch(t.pitchers);
       creditTonyPitch(t.pitchers);
+      creditKnownPitch(t.pitchers);
     }
     return { ...t, book: "tourney", note: "" };
   });
@@ -207,6 +215,7 @@ async function getPlwTourneyBook() {
     const wiz = wizTeam([], [], false);
     creditBrianPitch(wiz.pitchers);
     creditTonyPitch(wiz.pitchers);
+    creditKnownPitch(wiz.pitchers);
     teams.unshift({ ...wiz, book: "tourney", note: "" });
   }
   tourneyCache = {
@@ -223,7 +232,27 @@ async function getPlwTourneyBook() {
   return tourneyCache.data;
 }
 
-function attachPlwLeague(app, { requireTeam }) {
+function lineupKey(date, team) {
+  return String(date || "") + ":" + String(team || "").toUpperCase();
+}
+
+function parseLineup(text) {
+  const names = [];
+  for (const raw of String(text || "").split(/[\n,;|]+/)) {
+    let s = raw.replace(/^\s*\d+[.)\-:]\s*/, "").replace(/^[-*•]+\s*/, "").trim();
+    s = s.replace(/^\s*(P|C|1B|2B|3B|SS|LF|CF|RF|OF|IF|DH)\s*[-–:]\s*/i, "");
+    s = s.replace(/\s+\b(P|C|1B|2B|3B|SS|LF|CF|RF|OF|IF|DH|UTIL|Util)\b\.?\s*$/i, "").trim();
+    if (s.length < 2 || !/[a-zA-Z]/.test(s) || /^(lineup|batting|pitching|roster|vs\.?)\b/i.test(s)) continue;
+    names.push(s);
+  }
+  return names.slice(0, 16);
+}
+
+function emptyLineup() {
+  return { names: [], text: "" };
+}
+
+function attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson }) {
   app.get("/api/plw-league", requireTeam, async (_req, res) => {
     try {
       res.json(await getPlwLeagueBook());
@@ -237,6 +266,37 @@ function attachPlwLeague(app, { requireTeam }) {
     } catch (err) {
       res.status(502).json({ error: String(err.message || err), teams: [] });
     }
+  });
+  app.get("/api/lineups", requireTeam, async (req, res) => {
+    const data = await readJson("lineups.json");
+    const key = lineupKey(req.query.date, req.query.team);
+    res.json((data.nights && data.nights[key]) || emptyLineup());
+  });
+  app.put("/api/lineups", requireAdmin, async (req, res) => {
+    const date = String((req.body && req.body.date) || "");
+    const team = String((req.body && req.body.team) || "").toUpperCase();
+    if (!date || !team) return res.status(400).json({ error: "Date and team required" });
+    const text = String((req.body && req.body.text) || "").trim();
+    const data = await readJson("lineups.json");
+    data.nights = data.nights || {};
+    const key = lineupKey(date, team);
+    if (!text) {
+      delete data.nights[key];
+      await writeJson("lineups.json", data);
+      return res.json(emptyLineup());
+    }
+    const names = parseLineup(text);
+    if (!names.length) return res.status(400).json({ error: "Could not read any names from that paste" });
+    data.nights[key] = {
+      date,
+      team,
+      text,
+      names,
+      updatedBy: req.user && req.user.username,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeJson("lineups.json", data);
+    res.json(data.nights[key]);
   });
 }
 

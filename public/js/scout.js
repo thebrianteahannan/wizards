@@ -105,14 +105,15 @@ function tourneyStar(team, row) {
   return (team && team.code === "WIZ" && team.note) || /tourney/i.test(String((row && row.source) || ""));
 }
 
-function scoutRated(rows, scoreOf, toneOf, keys, empty, title, dir, pool, team) {
+function scoutRated(rows, scoreOf, toneOf, keys, empty, title, dir, pool, team, active) {
   if (!rows.length) return `<p class="muted">${escapeHtml(empty)}</p>`;
   return scoutSort(rows, scoreOf)
     .map((row) => {
       const score = scoreOf(row);
       const grade = score == null ? `<span class="muted">—</span>` : `<b style="${toneOf(score)}">${score}${tourneyStar(team, row) ? "*" : ""}</b>`;
       const marks = scoutExtremes(row, keys, dir, pool || rows);
-      return `<div class="roster-row" style="grid-template-columns:3.2rem 8.4rem minmax(0,1fr);align-items:center">
+      const dim = active && active.length && !oursHit(row, active) ? ";opacity:0.4" : "";
+      return `<div class="roster-row" style="grid-template-columns:3.2rem 8.4rem minmax(0,1fr);align-items:center${dim}">
         <span class="num" title="${escapeHtml(title)}">${grade}</span>
         <strong>${escapeHtml(row.name || [row.first, row.last].filter(Boolean).join(" "))}</strong>
         <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${scoutTags(row, keys, marks)}</div>
@@ -142,7 +143,7 @@ function scoutMenu(teams, code) {
   );
 }
 
-function scoutPane(team, pitFill, book, onlyNames) {
+function scoutPane(team, pitFill, book, onlyNames, active) {
   if (!team) return `<p class="muted">No league lines posted yet.</p>`;
   const marks = teamMarks(team, pitFill);
   const bats = [];
@@ -167,9 +168,9 @@ function scoutPane(team, pitFill, book, onlyNames) {
       </div>
       ${note ? `<p class="muted" style="margin:0 0 0.55rem">${escapeHtml(note)}</p>` : ""}
       <p class="kicker" style="margin:0 0 0.35rem">Hitting</p>
-      <div class="roster-list">${scoutRated(onlyNames ? (team.batters || []).filter((r) => oursHit(r, onlyNames)) : team.batters || [], hitterRating, ratingTone, SCOUT_BAT, "No hitting lines posted.", "Hit rating", BAT_DIR, bats, team)}</div>
+      <div class="roster-list">${scoutRated(onlyNames ? (team.batters || []).filter((r) => oursHit(r, onlyNames)) : team.batters || [], hitterRating, ratingTone, SCOUT_BAT, "No hitting lines posted.", "Hit rating", BAT_DIR, bats, team, onlyNames ? null : active)}</div>
       <p class="kicker" style="margin:1rem 0 0.35rem">Pitching</p>
-      <div class="roster-list">${scoutRated(onlyNames ? (team.pitchers || []).filter((r) => oursHit(r, onlyNames)) : team.pitchers || [], pitchRating, pitchTone, SCOUT_PIT, "No pitching lines posted.", "Pitch rating", PIT_DIR, arms, team)}</div>
+      <div class="roster-list">${scoutRated(onlyNames ? (team.pitchers || []).filter((r) => oursHit(r, onlyNames)) : team.pitchers || [], pitchRating, pitchTone, SCOUT_PIT, "No pitching lines posted.", "Pitch rating", PIT_DIR, arms, team, onlyNames ? null : active)}</div>
       <p class="muted" style="margin:0.55rem 0 0">Green is a top skill vs the league. Pink is a weak one. Up to three of each.</p>
     </div>`;
 }
@@ -322,13 +323,8 @@ function opponentName(offer) {
   return /^wizards?$/i.test(name) ? "" : name;
 }
 
-function foldName(s) {
-  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-function nameHit(a, b) {
-  const n = foldName(a), k = foldName(b);
-  return n && k && (n === k || n.includes(k) || k.includes(n));
-}
+function foldName(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, ""); }
+function nameHit(a, b) { const n = foldName(a), k = foldName(b); return n && k && (n === k || n.includes(k) || k.includes(n)); }
 function matchScoutTeam(teams, name) {
   return (teams || []).find((t) => nameHit(t.name, name));
 }
@@ -357,43 +353,8 @@ function weakKeys(rows, keys, dir, pool) {
     .map(([k]) => k);
 }
 
-function beatTips(us, them, um, tm, usRank, themRank, book) {
-  const { bats, arms } = bookPool(book);
-  const batTalk = {
-    so: "They punch out — mix speeds and expand late.",
-    avg: "They don't hit for average — challenge them in the zone.",
-    obp: "They don't get on — attack early and make them put it in play.",
-    slg: "They lack extra-base pop — play honest and throw strikes.",
-    ops: "Their bats are quiet — pound the zone and let defense work.",
-    hr: "They don't run into many bombs — live in the strike zone.",
-    bb: "They don't walk — throw strikes and let them get themselves out.",
-  };
-  const pitTalk = {
-    era: "Their arms leak runs — take pitches and hunt mistakes.",
-    whip: "They put traffic on — work counts and make them throw.",
-    bb: "They walk hitters — don't chase; let them beat themselves.",
-    h: "They give up hits — stay aggressive once you have a strike.",
-    avg: "Opponents hit them around — jump the first good one.",
-    l: "They drop games — keep pressure on every inning.",
-  };
-  const tips = [];
-  if (um.all != null && tm.all != null) {
-    tips.push(
-      um.all >= tm.all
-        ? `We grade even or better overall (#${usRank} vs #${themRank}). Play our game and make them beat us.`
-        : `They grade higher overall (#${themRank} vs our #${usRank}). Keep it close and win the short innings.`
-    );
-  }
-  if ((um.bat || 0) > (tm.pit || 0)) tips.push("Our bats grade hotter than their arms — jump them early.");
-  if ((tm.bat || 0) > (um.pit || 0)) tips.push("Their lineup is hotter than our pitching — no free passes, hide the heart of the plate.");
-  for (const k of weakKeys(them.batters, SCOUT_BAT, BAT_DIR, bats).slice(0, 2)) {
-    if (batTalk[k]) tips.push(batTalk[k]);
-  }
-  for (const k of weakKeys(them.pitchers, SCOUT_PIT, PIT_DIR, arms).slice(0, 2)) {
-    if (pitTalk[k]) tips.push(pitTalk[k]);
-  }
-  const seen = new Set();
-  return tips.filter((t) => seen.has(t) ? false : seen.add(t)).slice(0, 5);
+function beatTips(us, them, um, tm, usRank, themRank, book, extra) {
+  return typeof beatPlan === "function" ? beatPlan(us, them, um, tm, usRank, themRank, book, extra) : [];
 }
 
 function favorScore(um, tm) {
@@ -403,17 +364,29 @@ function favorScore(um, tm) {
   return Math.max(1, Math.min(99, Math.round(50 + 0.55 * bats + 0.45 * arms)));
 }
 
-function favorWord(n) {
-  if (n >= 70) return "Favorable";
-  if (n >= 50) return "Even";
-  return "Tough";
+function favorWord(n) { return n >= 70 ? "Favorable" : n >= 50 ? "Even" : "Tough"; }
+
+function vsPick(rows, fn) {
+  return (rows || []).map((r) => ({ r, s: fn(r) })).sort((a, b) => (a.s == null) - (b.s == null) || (b.s || 0) - (a.s || 0)).slice(0, 6);
+}
+function vsBoard(label, ours, theirs, fn, us, themName, theirNames) {
+  const L = vsPick(ours, fn), R = theirNames && theirNames.length && typeof vsPickLineup === "function" ? vsPickLineup(theirs, fn, theirNames, label === "bats") : vsPick(theirs, fn), cols = "minmax(0,1fr) 2.4rem 2.4rem 2.4rem minmax(0,1fr)";
+  const mark = (x, star) => (!x || x.s == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(x.s)}">${x.s}${star && tourneyStar(us, x.r) ? "*" : ""}</b>`);
+  const nm = (x, end) => `<strong style="text-align:${end}">${x && x.r ? escapeHtml(x.r.name) : ""}</strong>`;
+  const rows = [0, 1, 2, 3, 4, 5].map((i) => {
+    const a = L[i], b = R[i], d = a && b && a.s != null && b.s != null ? a.s - b.s : null;
+    const dx = d == null ? `<span class="muted">—</span>` : `<b style="${d > 0 ? "color:var(--go)" : d < 0 ? "color:#fb7185" : ""}">${d > 0 ? "+" : ""}${d}</b>`;
+    return `<div class="roster-row" style="grid-template-columns:${cols}">${nm(a, "left")}<span class="num">${mark(a, true)}</span><span class="num">${dx}</span><span class="num">${mark(b, false)}</span>${nm(b, "right")}</div>`;
+  }).join("");
+  return `<div style="margin-top:0.7rem"><div style="display:grid;grid-template-columns:${cols};gap:0.5rem;padding:0 0.65rem 0.2rem"><span class="kicker" style="margin:0">Our ${escapeHtml(label)}</span><span></span><span class="num muted">+/-</span><span></span><span class="kicker" style="margin:0;text-align:right">${escapeHtml(themName)} ${escapeHtml(label)}</span></div><div class="roster-list">${rows}</div></div>`;
 }
 
-function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames) {
+function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames, lineup, offer) {
   const um = teamMarks(us, pitFill);
   const tm = teamMarks(them, pitFill);
   const fav = favorScore(um, tm);
-  const tips = beatTips(us, them, um, tm, usRank, themRank, book)
+  const posted = (lineup && lineup.names) || [];
+  const tips = beatTips(us, them, um, tm, usRank, themRank, book, { lineup: posted, oursNames })
     .map((t) => `<li>${escapeHtml(t)}</li>`)
     .join("");
   const cols = "6.5rem 3.4rem 3.4rem 3.4rem 2.6rem";
@@ -425,13 +398,7 @@ function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames) {
       <span class="num">${markCell(m.all)}</span>
       <span class="num muted">#${rank}</span>
     </div>`;
-  const favHtml =
-    fav == null
-      ? ""
-      : `<span class="num" title="Matchup favorability" style="text-align:right">
-          <small class="muted" style="display:block;font-size:0.62rem">${escapeHtml(favorWord(fav))}</small>
-          <b style="${ratingTone(fav)}">${fav}</b>
-        </span>`;
+  const favHtml = fav == null ? "" : `<span class="num" title="Matchup favorability" style="text-align:right"><small class="muted" style="display:block;font-size:0.62rem">${escapeHtml(favorWord(fav))}</small><b style="${ratingTone(fav)}">${fav}</b></span>`;
   return `
     <div class="diamond-card card" style="margin-top:1rem">
       <p class="kicker">Matchup</p>
@@ -439,26 +406,16 @@ function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames) {
         <h2 style="margin:0">How we beat ${escapeHtml(them.name)}</h2>
         ${favHtml}
       </div>
-      <div class="roster-list">
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:0.85rem 1.4rem"><div class="roster-list">
         <div class="roster-row" style="grid-template-columns:${cols};justify-content:start;max-width:24rem">
           <span class="muted">Club</span><span class="num muted">BAT</span><span class="num muted">PIT</span><span class="num muted">ALL</span><span class="num muted">RK</span>
         </div>
         ${line("Wizards", um, usRank, true)}
         ${line(them.name, tm, themRank, false)}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1rem;margin-top:0.8rem">${[
-        ["Our bats", (us.batters || []).filter((r) => oursHit(r, oursNames)), hitterRating],
-        [them.name + " bats", them.batters, hitterRating],
-        ["Our arms", (us.pitchers || []).filter((r) => oursHit(r, oursNames)), pitchRating],
-        [them.name + " arms", them.pitchers, pitchRating],
-      ]
-        .map(([title, rows, fn]) => {
-          const list = (rows || []).map((r) => ({ r, s: fn(r) })).filter((x) => x.s != null).sort((a, b) => b.s - a.s).slice(0, 3);
-          const body = list.map((x) => `<div class="roster-row" style="grid-template-columns:2.8rem minmax(0,1fr)"><span class="num"><b style="${ratingTone(x.s)}">${x.s}${title.startsWith("Our") && tourneyStar(us, x.r) ? "*" : ""}</b></span><strong>${escapeHtml(x.r.name)}</strong></div>`).join("") || `<p class="muted">—</p>`;
-          return `<div><p class="kicker" style="margin:0 0 0.28rem">${escapeHtml(title)}</p><div class="roster-list">${body}</div></div>`;
-        })
-        .join("")}</div>
-      <ul class="rules" style="margin:0.7rem 0 0">${tips || "<li>Play clean. Make them beat us.</li>"}</ul>
+      </div><ul class="rules" style="margin:0;flex:1 1 16rem">${tips || "<li>Play clean. Make them beat us.</li>"}</ul></div>
+      ${typeof renderLineupBox === "function" ? renderLineupBox(them, offer, lineup) : ""}
+      ${vsBoard("bats", (us.batters || []).filter((r) => oursHit(r, oursNames)), them.batters, hitterRating, us, them.name, posted)}
+      ${vsBoard("arms", (us.pitchers || []).filter((r) => oursHit(r, oursNames)), them.pitchers, pitchRating, us, them.name, posted)}
     </div>`;
 }
 
@@ -486,12 +443,15 @@ async function loadNightMatchup(offer, oursNames) {
     }
     const themRank = ranked.findIndex((t) => t.code === them.code) + 1;
     const usRank = us ? ranked.findIndex((t) => t.code === "WIZ") + 1 : "—";
-    host.innerHTML = us ? renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames || []) : "";
+    const lineup = await api.get("/api/lineups?date=" + encodeURIComponent(offer.date || offer.day || "") + "&team=" + encodeURIComponent(them.code)).catch(() => ({ names: [], text: "" }));
+    const posted = (lineup && lineup.names) || [];
+    host.innerHTML = us ? renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames || [], lineup, offer) : "";
+    if (typeof bindOppLineup === "function") bindOppLineup(() => loadNightMatchup(offer, oursNames));
     const opp = document.getElementById("night-opp-host");
     if (opp) {
       opp.innerHTML =
         `<p class="kicker" style="margin:1rem 0 0.4rem">Opponent · #${themRank} ${escapeHtml(them.name)}</p>` +
-        scoutPane(them, pitFill, book) +
+        scoutPane(them, pitFill, book, null, posted) +
         (us ? `<p class="kicker" style="margin:1rem 0 0.4rem">Wizards · #${usRank}</p>` + scoutPane(us, pitFill, book, oursNames || []) : "");
     }
   } catch (err) {

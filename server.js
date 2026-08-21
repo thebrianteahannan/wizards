@@ -430,7 +430,7 @@ attachRecruitActions(app, {
   requireAdmin,
   positions: JOIN_POS,
 });
-attachPlwLeague(app, { requireTeam });
+attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson });
 
 const FEE_MODELS = ["flat", "split", "core", "play"];
 

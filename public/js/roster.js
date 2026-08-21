@@ -131,7 +131,7 @@ function pitcherKey(squad) {
 }
 
 function pitcherArms(players) {
-  return players.filter((p) => (p.positions || []).includes("P"));
+  return players.filter((p) => (p.positions || []).includes("P") || p.id === "jose-gonzalez" || p.id === "cam");
 }
 
 function pickPitcherId(players, squad) {

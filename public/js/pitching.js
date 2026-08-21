@@ -52,11 +52,11 @@ function pitchTone(score) {
 }
 
 function isArm(player, row) {
-  return row || (player.positions || []).includes("P");
+  return row || (player.positions || []).includes("P") || player.id === "jose-gonzalez" || player.id === "cam";
 }
 
 function pitchLine(row) {
-  if (!row) return `<span class="muted">No PLW pitching line yet</span>`;
+  if (!row || !(pitchInnings(row.ip) > 0)) return `<span class="muted">No PLW pitching line yet</span>`;
   return PITCH_LINE.map(([key, label]) => `${label} ${escapeHtml(row[key] == null || row[key] === "" ? "—" : String(row[key]))}`).join(" · ");
 }
 
