@@ -385,28 +385,104 @@ function tallySlot(avail, day, windowId) {
   return { yes, maybe, names };
 }
 
-function renderTeamHub() {
+function shortDay(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  return new Date(iso + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function bestUpcomingMatchup(events, book) {
+  const today = new Date().toISOString().slice(0, 10);
+  let best = null;
+  for (const e of (events || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))) {
+    if (e.kind !== "league" || !e.date || e.date < today) continue;
+    const name = typeof schedOpponent === "function" ? schedOpponent(e.title) : "";
+    if (!name || typeof matchupFavor !== "function") continue;
+    const fav = matchupFavor({ note: "vs " + name }, book);
+    if (fav == null) continue;
+    if (!best || fav > best.fav) best = { name, fav, date: e.date };
+  }
+  if (!best) return "";
+  const word = typeof favorWord === "function" ? favorWord(best.fav) : "";
+  return [`Best · vs ${best.name}`, shortDay(best.date), word, best.fav].filter((x) => x !== "" && x != null).join(" · ");
+}
+
+function nextTournamentTag(events) {
+  const today = new Date().toISOString().slice(0, 10);
+  const e = (events || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).find((x) => x.kind === "tournament" && x.date && x.date >= today);
+  if (!e) return "";
+  const title = String(e.title || "Tournament").replace(/\s+[—–-].*$/, "").slice(0, 28);
+  return [title && `Next · ${title}`, shortDay(e.date)].filter(Boolean).join(" · ");
+}
+
+function practiceTag(avail) {
+  const n = ((avail && avail.offers) || []).length;
+  return n ? (n === 1 ? "1 session posted" : n + " sessions posted") : "";
+}
+
+function wizLeagueRankTag(teams) {
+  const pool = teams || [];
+  if (typeof rankByRecord === "function" && pool.some((t) => t.w != null || t.l != null)) {
+    const list = rankByRecord(pool);
+    const i = list.findIndex((t) => t.code === "WIZ");
+    if (i < 0) return "";
+    return `Wizards #${i + 1} · ${(list[i].w || 0)}-${list[i].l || 0}`;
+  }
+  if (typeof rankedTeams !== "function") return "";
+  const list = rankedTeams(pool);
+  const i = list.findIndex((t) => t.code === "WIZ");
+  return i >= 0 ? `Wizards #${i + 1}` : "";
+}
+
+function recruitNeedTag(roster) {
+  const players = (roster && roster.players) || [];
+  const n = typeof onSquad === "function" ? players.filter((p) => onSquad(p, "league")).length : players.length;
+  return n < 12 ? "Looking for more players" : "";
+}
+
+function recruitQueueTag(data) {
+  const n = ((data && data.recruits) || []).length;
+  return n ? (n === 1 ? "1 in queue" : n + " in queue") : "";
+}
+
+function latestAnnounceTag(board) {
+  const posts = [...((board && board.posts) || [])].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  const p = posts[0];
+  if (!p) return "";
+  const text = String(p.body || p.title || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return text.length > 240 ? text.slice(0, 237) + "…" : text;
+}
+
+function renderTeamHub(favTag, tourneyTag, pracTag, rankTag, tRankTag, recruitTag, queueTag, announceTag) {
   const cards = [
-    ["#/board", "◉", "Announcements", "Board notes for the club."],
-    ["#/availability", "◷", "League", "Mark nights. Need 6 yes at the same time."],
-    ["#/scout", "▦", "League rankings", "Overview and every Challengers club."],
-    ["#/tourney-scout", "▣", "Tournament rankings", "2026 Tourney Season. Every club on that board."],
-    ["#/tournament", "✸", "Tournament", "Who can play each tournament date."],
-    ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no."],
+    ["#/board", "◉", "Announcements", "Board notes for the club.", announceTag],
+    ["#/availability", "◷", "League", "Mark nights. Need 6 yes at the same time.", ["Set your days", favTag].filter(Boolean)],
+    ["#/scout", "▦", "League rankings", "Overview and every Challengers club.", rankTag],
+    ["#/tourney-scout", "▣", "Tournament rankings", "Each event, plus an overall tally.", tRankTag],
+    ["#/tournament", "✸", "Tournament", "Who can play each tournament date.", ["Set your days", tourneyTag].filter(Boolean)],
+    ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no.", pracTag],
     ["#/gear", "✦", "Gear", "Jersey number and size."],
-    ["#/join", "+", "Recruit", "Put someone in the book."],
-    ["#/recruits", "☰", "Recruits", "Inbox, contact, move onto the roster."],
+    ["#/join", "+", "Recruit", "Put someone in the book.", recruitTag],
+    ["#/recruits", "☰", "Recruits", "Inbox, contact, move onto the roster.", queueTag],
     ["#/dues", "$", "Dues", "Who paid and what they owe."],
     ["#/strategy", "◈", "Strategy", "Team-only talk."],
   ]
-    .map(
-      ([href, icon, title, blurb]) => `
+    .map(([href, icon, title, blurb, tag]) => {
+      const wrap = title === "Announcements";
+      const tags = (Array.isArray(tag) ? tag : tag ? [tag] : [])
+        .map(
+          (t) =>
+            `<span class="tag"${wrap ? ' style="display:block;white-space:normal;text-transform:none;letter-spacing:0.03em;line-height:1.4;max-width:100%"' : ""}>${escapeHtml(t)}</span>`
+        )
+        .join("");
+      return `
       <a class="card feature" href="${href}">
         <span class="icon">${icon}</span>
         <h3>${title}</h3>
+        ${tags}
         <p class="muted">${blurb}</p>
-      </a>`
-    )
+      </a>`;
+    })
     .join("");
   return `
     <p class="kicker">Locker room</p>

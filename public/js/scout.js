@@ -184,7 +184,7 @@ function renderScout(data, code) {
   return `
     <p class="kicker">Locker room</p>
     <h1>League rankings</h1>
-    <p class="lede">${escapeHtml((data && data.note) || "Florida Challengers League stats by team.")} Hitting is weighted by at-bats. Pitching is weighted by innings. Overall is 55% bats / 45% arms. * Wizards: tourney bats and arms. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+    <p class="lede">${escapeHtml((data && data.note) || "Florida Challengers League stats by team.")} Hitting is weighted by at-bats. Pitching is weighted by innings. Overall is 55% bats / 45% arms. * Wizards: tourney bats and arms. <a href="#/tourney-scout?event=historical">Historical leagues</a>. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
     <div class="actions" data-scout-menu style="margin-top:0.7rem">${menu}</div>
     <div id="scout-pane" style="margin-top:1rem">${pick ? scoutPane(pick, pitFill, data && data.teams) : overviewPane(data)}</div>
     <div class="actions" data-scout-menu style="margin-top:1rem">${menu}</div>
@@ -301,6 +301,7 @@ function overviewPane(data) {
         <div><p class="kicker" style="margin:0 0 0.35rem">Top bats</p><div class="roster-list">${topLeaders(list, "batters", hitterRating, ratingTone)}</div></div>
         <div><p class="kicker" style="margin:0 0 0.35rem">Top arms</p><div class="roster-list">${topLeaders(list, "pitchers", pitchRating, pitchTone)}</div></div>
       </div>
+      ${typeof winTrackHtml === "function" ? winTrackHtml(list) : ""}
       <p class="muted" style="margin:0.55rem 0 0">* Wizards: tourney hitting and pitching. Cyan made the top 10. We always tack on our next bat and arm. Gold is tied or within 2 of 10th. Dim dashed is further back.</p>
     </div>
   `;

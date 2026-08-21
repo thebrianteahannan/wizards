@@ -3,6 +3,7 @@ const SEASON = 110335;
 const TOURNEY = 110274;
 const BATTER_BASE = "https://www.mystatsonline.com/ballsports/visitor/league/stats/batter.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
 const PITCHER_BASE = "https://www.mystatsonline.com/ballsports/visitor/league/stats/pitcher.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
+const STANDINGS_BASE = "https://www.mystatsonline.com/ballsports/visitor/league/standings/standings.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
 const BATTER_URL = BATTER_BASE + SEASON;
 const PITCHER_URL = PITCHER_BASE + SEASON;
 const CELL_KEYS = ["g", "avg", "slg", "obp", "ab", "r", "h", "singles", "doubles", "triples", "hr", "rbi", "tb", "so", "bb", "sf", "tpa", "roe", "ops", "fc"];
@@ -24,8 +25,19 @@ const TEAM_NAMES = {
   WST: "Wiffle Shts",
 };
 
+const TOURNEY_EVENTS = [
+  { id: "overall", label: "Overall" },
+  { id: "aug1", label: "Aug 1 · Brooksville", date: "2026-08-01", season: 110274 },
+  { id: "eos", label: "End of Summer Showdown", date: "2026-08-29" },
+  { id: "sep26", label: "Sep 26 · Spartan Challenge", date: "2026-09-26" },
+  { id: "faceoff", label: "Florida Faceoff", date: "2026-10-17" },
+  { id: "marathon", label: "The Marathon Game", date: "2026-11-06", season: 110567 },
+  { id: "dec5", label: "Dec 5 Tournament", date: "2026-12-05" },
+];
+
 let cache = { at: 0, data: null };
-let tourneyCache = { at: 0, data: null };
+let seasonBooks = {};
+let tourneyPack = {};
 
 function parseAllRows(html, keys) {
   const rows = [];
@@ -49,6 +61,62 @@ function parseAllRows(html, keys) {
     rows.push(row);
   }
   return rows;
+}
+
+function parseStandings(html) {
+  const rows = [];
+  const seen = {};
+  for (const chunk of String(html || "").split("<tr")) {
+    const code = ((chunk.match(/standing_team_abbr">([^<]+)</) || [])[1] || "").trim();
+    if (!code || seen[code]) continue;
+    const name = ((chunk.match(/standing_team_name">([^<]+)</) || [])[1] || "").trim();
+    const cells = [...chunk.matchAll(/<td class=" text-center"(?: data-sort="[^"]*")?>([^<]*)<\/td>/g)].map((m) => m[1]);
+    if (cells.length < 3) continue;
+    const pctI = cells.findIndex((c) => /^[01]?(?:\.\d+)$/.test(String(c).trim()));
+    const w = Number(cells[pctI === 2 ? 0 : 1]) || 0;
+    const l = Number(cells[pctI === 2 ? 1 : 2]) || 0;
+    const gp = pctI === 2 ? w + l : Number(cells[0]) || 0;
+    const rs = Number(cells[pctI === 2 ? 6 : 8]) || 0;
+    const ra = Number(cells[pctI === 2 ? 7 : 9]) || 0;
+    seen[code] = true;
+    rows.push({ code, name: name || TEAM_NAMES[code] || code, gp, w, l, pct: gp ? w / gp : 0, rs, ra, rd: rs - ra, streak: cells[pctI === 2 ? 9 : 10] || "" });
+  }
+  return rows;
+}
+
+function applyStandings(teams, table) {
+  const map = {};
+  for (const r of table || []) map[r.code] = r;
+  for (const t of teams) {
+    const s = map[t.code];
+    if (s) Object.assign(t, s);
+  }
+  for (const s of table || []) {
+    if (teams.some((t) => t.code === s.code)) continue;
+    teams.push({ code: s.code, name: s.name || TEAM_NAMES[s.code] || s.code, batters: [], pitchers: [], book: "tourney", note: "", ...s });
+  }
+  return teams;
+}
+
+function mergeRecords(books) {
+  const map = {};
+  for (const teams of books || []) {
+    for (const t of teams || []) {
+      if (t.w == null && t.l == null) continue;
+      const row = map[t.code] || (map[t.code] = { code: t.code, gp: 0, w: 0, l: 0, rs: 0, ra: 0 });
+      row.gp += Number(t.gp) || 0;
+      row.w += Number(t.w) || 0;
+      row.l += Number(t.l) || 0;
+      row.rs += Number(t.rs) || 0;
+      row.ra += Number(t.ra) || 0;
+    }
+  }
+  for (const row of Object.values(map)) {
+    row.pct = row.gp ? row.w / row.gp : 0;
+    row.rd = row.rs - row.ra;
+    row.streak = "";
+  }
+  return map;
 }
 
 async function fetchTable(url, keys) {
@@ -170,7 +238,13 @@ function groupTeams(batters, pitchers) {
 
 async function getPlwLeagueBook() {
   if (cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
-  const [batters, pitchers] = await Promise.all([fetchTable(BATTER_URL, CELL_KEYS), fetchTable(PITCHER_URL, PITCH_KEYS)]);
+  const [batters, pitchers, standHtml] = await Promise.all([
+    fetchTable(BATTER_URL, CELL_KEYS),
+    fetchTable(PITCHER_URL, PITCH_KEYS),
+    fetch(STANDINGS_BASE + SEASON, { headers: { "user-agent": "WizardsHub/1.0" } })
+      .then((r) => r.text())
+      .catch(() => ""),
+  ]);
   let teams = groupTeams(batters, pitchers);
   if (!teams.some((t) => t.code === "WIZ")) {
     const [bT, pT] = await Promise.all([fetchTable(BATTER_BASE + TOURNEY, CELL_KEYS), fetchTable(PITCHER_BASE + TOURNEY, PITCH_KEYS)]);
@@ -181,6 +255,11 @@ async function getPlwLeagueBook() {
     creditBrianPitch(wiz.pitchers);
     creditTonyPitch(wiz.pitchers);
     creditKnownPitch(wiz.pitchers);
+  }
+  const byCode = {};
+  for (const s of parseStandings(standHtml)) byCode[s.code] = s;
+  for (const t of teams) {
+    if (byCode[t.code]) Object.assign(t, byCode[t.code]);
   }
   cache = {
     at: Date.now(),
@@ -195,41 +274,136 @@ async function getPlwLeagueBook() {
   return cache.data;
 }
 
-async function getPlwTourneyBook() {
-  if (tourneyCache.data && Date.now() - tourneyCache.at < 15 * 60 * 1000) return tourneyCache.data;
-  const [batters, pitchers] = await Promise.all([
-    fetchTable(BATTER_BASE + TOURNEY, CELL_KEYS),
-    fetchTable(PITCHER_BASE + TOURNEY, PITCH_KEYS),
+function eventMeta() {
+  return TOURNEY_EVENTS.map((e) => ({ id: e.id, label: e.label, date: e.date || "", posted: e.id === "overall" || !!e.season }));
+}
+
+function ipOuts(v) {
+  const p = String(v == null ? "0" : v).split(".");
+  return (Number(p[0]) || 0) * 3 + (Number(p[1]) || 0);
+}
+
+function mergePlayers(lists, pitching) {
+  const map = {};
+  for (const row of lists) {
+    const k = [row.team, row.last, row.first].join("|");
+    (map[k] || (map[k] = [])).push(row);
+  }
+  return Object.values(map).map((rows) => {
+    const base = { ...rows[0] };
+    const add = (key) => rows.reduce((s, r) => s + num(r[key]), 0);
+    if (pitching) {
+      const ip = rows.reduce((s, r) => s + ipOuts(r.ip), 0);
+      const er = add("er"), h = add("h"), bb = add("bb"), so = add("so");
+      const inn = ip / 3;
+      base.g = add("g");
+      ["w", "l", "sv", "r", "h", "er", "bb", "so", "hr", "bf", "gs", "cg", "sho"].forEach((key) => {
+        base[key] = String(add(key));
+      });
+      base.ip = Math.floor(ip / 3) + "." + (ip % 3);
+      base.era = inn ? ((er * 9) / inn).toFixed(2) : "—";
+      base.whip = inn ? ((h + bb) / inn).toFixed(2) : "—";
+      base.sox = inn ? ((so * 6) / inn).toFixed(2) : "—";
+      base.bbx = inn ? ((bb * 6) / inn).toFixed(2) : "—";
+      return base;
+    }
+    const ab = add("ab"), h = add("h"), bb = add("bb"), sf = add("sf"), tb = add("tb");
+    ["g", "r", "singles", "doubles", "triples", "hr", "rbi", "so", "roe", "fc", "tpa"].forEach((key) => {
+      base[key] = String(add(key));
+    });
+    base.ab = String(ab);
+    base.h = String(h);
+    base.bb = String(bb);
+    base.sf = String(sf);
+    base.tb = String(tb);
+    base.avg = ab ? (h / ab).toFixed(3) : ".000";
+    base.slg = ab ? (tb / ab).toFixed(3) : ".000";
+    base.obp = ab + bb + sf ? ((h + bb) / (ab + bb + sf)).toFixed(3) : ".000";
+    base.ops = (Number(base.obp) + Number(base.slg)).toFixed(3);
+    return base;
+  });
+}
+
+function flattenKind(books, kind) {
+  const rows = [];
+  for (const teams of books) {
+    for (const t of teams || []) rows.push(...(t[kind] || []));
+  }
+  return rows;
+}
+
+function stampTourney(teams) {
+  return teams.map((t) => ({ ...t, book: "tourney", note: "" }));
+}
+
+async function loadSeasonTeams(seasonId) {
+  const hit = seasonBooks[seasonId];
+  if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.teams;
+  const [batters, pitchers, standHtml] = await Promise.all([
+    fetchTable(BATTER_BASE + seasonId, CELL_KEYS),
+    fetchTable(PITCHER_BASE + seasonId, PITCH_KEYS),
+    fetch(STANDINGS_BASE + seasonId, { headers: { "user-agent": "WizardsHub/1.0" } })
+      .then((r) => r.text())
+      .catch(() => ""),
   ]);
   creditBrianHit(batters);
-  const teams = groupTeams(batters, pitchers).map((t) => {
-    if (t.code === "WIZ") {
-      creditBrianHit(t.batters);
-      creditBrianPitch(t.pitchers);
-      creditTonyPitch(t.pitchers);
-      creditKnownPitch(t.pitchers);
-    }
-    return { ...t, book: "tourney", note: "" };
-  });
-  if (!teams.some((t) => t.code === "WIZ")) {
+  const teams = stampTourney(
+    groupTeams(batters, pitchers).map((t) => {
+      if (t.code === "WIZ") {
+        creditBrianHit(t.batters);
+        creditBrianPitch(t.pitchers);
+        creditTonyPitch(t.pitchers);
+        creditKnownPitch(t.pitchers);
+      }
+      return t;
+    })
+  );
+  if (!teams.some((t) => t.code === "WIZ") && seasonId === TOURNEY) {
     const wiz = wizTeam([], [], false);
     creditBrianPitch(wiz.pitchers);
     creditTonyPitch(wiz.pitchers);
     creditKnownPitch(wiz.pitchers);
     teams.unshift({ ...wiz, book: "tourney", note: "" });
   }
-  tourneyCache = {
-    at: Date.now(),
-    data: {
-      book: "tourney",
-      label: "2026 Tourney Season",
-      note: "All clubs from the 2026 Tourney Season.",
-      source: BATTER_BASE + TOURNEY,
-      pitchSource: PITCHER_BASE + TOURNEY,
-      teams,
-    },
+  applyStandings(teams, parseStandings(standHtml));
+  seasonBooks[seasonId] = { at: Date.now(), teams };
+  return teams;
+}
+
+async function getPlwTourneyBook(eventId) {
+  const id = TOURNEY_EVENTS.some((e) => e.id === eventId) ? eventId : "overall";
+  const hit = tourneyPack[id];
+  if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.data;
+  const ev = TOURNEY_EVENTS.find((e) => e.id === id);
+  const events = eventMeta();
+  let teams = [];
+  let season = ev && ev.season;
+  let note = ev && ev.season ? "Posted PLW board for this event." : "No PLW board posted for this event yet.";
+  if (id === "overall") {
+    const books = await Promise.all(TOURNEY_EVENTS.filter((e) => e.season).map((e) => loadSeasonTeams(e.season)));
+    teams = stampTourney(groupTeams(mergePlayers(flattenKind(books, "batters"), false), mergePlayers(flattenKind(books, "pitchers"), true)));
+    const rec = mergeRecords(books);
+    for (const t of teams) {
+      if (rec[t.code]) Object.assign(t, rec[t.code]);
+    }
+    applyStandings(teams, Object.values(rec));
+    season = TOURNEY;
+    note = "Tally of every posted tournament, ranked by W-L. Pick an event for that day’s board.";
+  } else if (ev && ev.season) {
+    teams = await loadSeasonTeams(ev.season);
+  }
+  const data = {
+    book: "tourney",
+    event: id,
+    events,
+    label: ev && ev.label ? ev.label : "Overall",
+    note,
+    source: BATTER_BASE + (season || TOURNEY),
+    pitchSource: PITCHER_BASE + (season || TOURNEY),
+    teams,
   };
-  return tourneyCache.data;
+  tourneyPack[id] = { at: Date.now(), data };
+  return data;
 }
 
 function lineupKey(date, team) {
@@ -260,9 +434,9 @@ function attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson }
       res.status(502).json({ error: String(err.message || err), teams: [] });
     }
   });
-  app.get("/api/plw-tourney", requireTeam, async (_req, res) => {
+  app.get("/api/plw-tourney", requireTeam, async (req, res) => {
     try {
-      res.json(await getPlwTourneyBook());
+      res.json(await getPlwTourneyBook(req.query.event));
     } catch (err) {
       res.status(502).json({ error: String(err.message || err), teams: [] });
     }
@@ -298,6 +472,20 @@ function attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson }
     await writeJson("lineups.json", data);
     res.json(data.nights[key]);
   });
+  require("./plw-history").attachHistory(app, { requireTeam });
 }
 
-module.exports = { attachPlwLeague, getPlwLeagueBook };
+module.exports = {
+  attachPlwLeague,
+  getPlwLeagueBook,
+  fetchTable,
+  groupTeams,
+  parseStandings,
+  applyStandings,
+  eventMeta,
+  BATTER_BASE,
+  PITCHER_BASE,
+  STANDINGS_BASE,
+  CELL_KEYS,
+  PITCH_KEYS,
+};

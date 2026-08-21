@@ -33,12 +33,12 @@ function playerMark(avail, playerId, offer, kind) {
 
 function rosterRows(players, squad) {
   return players
-    .map((p) => {
+    .map((p, i) => {
       const pos = (p.positions || []).join(", ") || "Util";
       const inBook = onSquad(p, squad);
       const tag = isAdmin()
-        ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit">${escapeHtml(pos)}</button>`
-        : `<span class="tag">${escapeHtml(pos)}</span>`;
+        ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit;white-space:nowrap">${escapeHtml(pos)}</button>`
+        : `<span class="tag" style="white-space:nowrap">${escapeHtml(pos)}</span>`;
       const last = isAdmin()
         ? `<span>${["league", "tournament"]
             .map((book) => {
@@ -48,7 +48,8 @@ function rosterRows(players, squad) {
             .join("")}</span>`
         : `<span class="muted">${inBook ? (p.born ? escapeHtml(p.born) : "") : squad === "league" ? "Not league" : "Not tourney"}</span>`;
       return `
-        <div class="roster-row" style="${inBook ? "" : "opacity:0.55"}">
+        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem 5.2rem;${inBook ? "" : "opacity:0.55"}">
+          <span class="num">${i + 1}</span>
           <strong>${escapeHtml(p.name)}</strong>
           <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
           ${tag}

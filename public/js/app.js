@@ -148,7 +148,18 @@ async function load() {
         app.innerHTML = renderLock("team");
         bindPageLock("team");
       } else {
-        app.innerHTML = renderTeamHub();
+        const [schedule, book, practice, tourney, roster, recruits, board] = await Promise.all([
+          api.get("/api/schedule").catch(() => ({ events: [] })),
+          api.get("/api/plw-league").catch(() => ({ teams: [] })),
+          api.get("/api/availability?kind=practice").catch(() => ({ offers: [] })),
+          api.get("/api/plw-tourney").catch(() => ({ teams: [] })),
+          api.get("/api/roster").catch(() => ({ players: [] })),
+          api.get("/api/recruits").catch(() => ({ recruits: [] })),
+          api.get("/api/board").catch(() => ({ posts: [] })),
+        ]);
+        const events = (schedule && schedule.events) || [];
+        const teams = (book && book.teams) || [];
+        app.innerHTML = renderTeamHub(bestUpcomingMatchup(events, teams), nextTournamentTag(events), practiceTag(practice), wizLeagueRankTag(teams), wizLeagueRankTag((tourney && tourney.teams) || []), recruitNeedTag(roster), recruitQueueTag(recruits), latestAnnounceTag(board));
       }
     } else if (route === "scout") {
       if (!isTeam()) {
@@ -165,10 +176,18 @@ async function load() {
         app.innerHTML = renderLock("team");
         bindPageLock("team");
       } else {
-        const data = await api.get("/api/plw-tourney");
-        const team = new URLSearchParams(location.hash.split("?")[1] || "").get("team");
-        app.innerHTML = renderTourneyScout(data, team);
-        bindTourneyScout();
+        const q = new URLSearchParams(location.hash.split("?")[1] || "");
+        const event = q.get("event") || "overall";
+        const team = q.get("team");
+        if (event === "historical") {
+          const data = await api.get("/api/plw-history?season=" + encodeURIComponent(q.get("season") || "all"));
+          app.innerHTML = renderHistoryScout(data);
+          bindTourneyScout("historical");
+        } else {
+          const data = await api.get("/api/plw-tourney?event=" + encodeURIComponent(event));
+          app.innerHTML = renderTourneyScout(data, team, event);
+          bindTourneyScout(data.event || event);
+        }
       }
     } else if (route === "overview") {
       location.hash = "#/scout";
