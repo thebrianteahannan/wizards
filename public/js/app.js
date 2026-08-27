@@ -200,9 +200,13 @@ async function load() {
         app.innerHTML = renderLock("team");
         bindPageLock("team");
       } else {
-        const rec = await api.get("/api/recruits");
-        app.innerHTML = renderRecruits(rec);
-        bindRecruits(rec);
+        const [rec, league] = await Promise.all([
+          api.get("/api/recruits"),
+          api.get("/api/plw-league").catch(() => ({ teams: [] })),
+        ]);
+        const book = (league && league.teams) || [];
+        app.innerHTML = renderRecruits(rec, "", book);
+        bindRecruits(rec, book);
       }
     }
   } catch (err) {

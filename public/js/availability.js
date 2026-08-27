@@ -5,8 +5,6 @@ const AVAIL_META = {
     lede: "Mark the windows Adam sent. Green at NEED yes.",
     from: "From Adam",
     board: "Windows on the board",
-    save: "Save my week",
-    hash: "#/availability",
   },
   tournament: {
     kind: "tournament",
@@ -14,8 +12,6 @@ const AVAIL_META = {
     lede: "Who can play each tournament. Green at NEED yes.",
     from: "On the calendar",
     board: "Tournament dates",
-    save: "Save my tournaments",
-    hash: "#/tournament",
   },
   practice: {
     kind: "practice",
@@ -23,8 +19,6 @@ const AVAIL_META = {
     lede: "Who can make practice. Green at NEED yes.",
     from: "Practice windows",
     board: "Sessions on the board",
-    save: "Save my practice",
-    hash: "#/practice",
   },
 };
 
@@ -61,24 +55,34 @@ function windowsForOffer(offer, fallback) {
   return times.map((label) => ({ id: slugTime(label), label, hint: label }));
 }
 
+function adminRestChips(roster, avail, day, kind) {
+  const book = kind === "league" || kind === "tournament" ? kind : "";
+  const tags = (roster.players || [])
+    .filter((p) => {
+      const st = ((((avail.players || {})[p.id] || {}).days || {})[day] || {}).status;
+      return st !== "yes" && st !== "maybe" && (!book || typeof onSquad !== "function" || onSquad(p, book));
+    })
+    .map((p) => `<span class="chip" data-admin-sign="${escapeHtml(p.id)}" style="opacity:0.4;cursor:pointer">${escapeHtml(p.name)}</span>`)
+    .join("");
+  return tags ? `<div class="chips" data-admin-add style="margin-top:0.3rem">${tags}</div>` : "";
+}
+
+function chipName(n) {
+  return n && n.name != null ? n.name : String(n || "");
+}
+
 function availChips(slot, dayAll) {
-  const inSlot = new Set([...(slot.yes || []), ...(slot.maybe || [])]);
+  const inSlot = new Set([...(slot.yes || []), ...(slot.maybe || [])].map(chipName));
   return [
-    ...(slot.yes || []).map((n) => `<span class="chip yes">${escapeHtml(n)}</span>`),
-    ...(slot.maybe || []).map((n) => `<span class="chip maybe">${escapeHtml(n)}?</span>`),
-    ...(dayAll.yes || []).filter((n) => !inSlot.has(n)).map((n) => `<span class="chip">${escapeHtml(n)}</span>`),
-    ...(dayAll.maybe || []).filter((n) => !inSlot.has(n)).map((n) => `<span class="chip">${escapeHtml(n)}?</span>`),
+    ...(slot.yes || []).map((n) => `<span class="chip yes"${n && n.id ? ` data-admin-drop="${escapeHtml(n.id)}" style="cursor:pointer"` : ""}>${escapeHtml(chipName(n))}</span>`),
+    ...(slot.maybe || []).map((n) => `<span class="chip maybe">${escapeHtml(chipName(n))}?</span>`),
+    ...(dayAll.yes || []).filter((n) => !inSlot.has(chipName(n))).map((n) => `<span class="chip">${escapeHtml(chipName(n))}</span>`),
+    ...(dayAll.maybe || []).filter((n) => !inSlot.has(chipName(n))).map((n) => `<span class="chip">${escapeHtml(chipName(n))}?</span>`),
   ].join("");
 }
 
 function lockLabel(day) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-    return new Date(day + "T12:00:00").toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return new Date(day + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   return cap(day);
 }
 
@@ -109,13 +113,13 @@ async function renderAvailability(roster, avail, playerId, kind) {
       book = [];
     }
   }
-  const dayCols = offers.map((offer) => {
+  const dayCard = (offer) => {
     const day = offerKey(offer, page.kind);
     const when = new Date((offer.date || "") + "T12:00:00");
-    const label = Number.isNaN(when.getTime())
-      ? cap(offer.day)
-      : when.toLocaleDateString("en-US", { weekday: "short" });
-    const num = Number.isNaN(when.getTime()) ? "" : when.getDate();
+    const ok = !Number.isNaN(when.getTime());
+    const label = ok ? when.toLocaleDateString("en-US", { weekday: "short" }) : cap(offer.day);
+    const num = ok ? when.getDate() : "";
+    const mon = ok ? when.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : "";
     const entry = mine[day] || { status: "no", windows: [] };
     const dayWindows = windowsForOffer(offer, avail.windows || []);
     const byWindow = dayWindows.map((w) => ({ w, t: tallySlot(avail, day, w.id) }));
@@ -143,18 +147,20 @@ async function renderAvailability(roster, avail, playerId, kind) {
     const favHtml =
       fav == null
         ? ""
-        : `<span class="num" title="Matchup favorability" style="margin-left:auto;letter-spacing:0;text-align:right;line-height:1.05"><small class="muted" style="display:block;font-size:0.55rem;font-family:var(--sans,inherit)">${typeof favorWord === "function" ? escapeHtml(favorWord(fav)) : ""}</small><b style="font-family:var(--display);font-size:1.15rem;${ratingTone(fav)}">${fav}</b></span>`;
+        : `<span class="num" title="Matchup difficulty — higher is harder" style="margin-left:auto;letter-spacing:0;text-align:right;line-height:1.05"><small style="display:block;font-size:0.55rem;font-family:var(--sans,inherit);${typeof favorTone === "function" ? favorTone(fav) : ""}">${typeof favorWord === "function" ? escapeHtml(favorWord(fav)) : ""}</small><b style="font-family:var(--display);font-size:1.15rem;${typeof favorTone === "function" ? favorTone(fav) : ""}">${fav}</b></span>`;
     return `
       <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}" style="cursor:pointer">
-        <h3>${num ? `<span class="day-num">${num}</span>` : ""}${label}${favHtml}</h3>
+        <h3>${num ? `<span class="day-num" style="font-family:var(--sport);letter-spacing:0.06em">${escapeHtml(mon)} ${num}</span>` : ""}${label}${favHtml}</h3>
         <p class="day-note">${escapeHtml(offer.note)}</p>
         <div class="win-line">${counts}</div>
         <div class="seg">${segs}</div>
         <div class="windows">${wins}</div>
         <div class="chips">${chips || '<span class="muted">Empty</span>'}</div>
+        ${isManager ? adminRestChips(roster, avail, day, page.kind) : ""}
         ${lockBtn}
       </article>`;
-  }).join("");
+  };
+  const dayCols = offers.map(dayCard).join("");
 
   return `
     <p class="kicker">Need ${needed} at the same time</p>
@@ -218,20 +224,20 @@ function liveTally(avail, day, windowId, myId, myName, myStatus, myWindows) {
     seen.add(id);
     if (status === "yes" && inWindow) {
       yes += 1;
-      names.yes.push(p.name || id);
+      names.yes.push({ id, name: p.name || id });
     } else if (status === "maybe" && inWindow) {
       maybe += 1;
-      names.maybe.push(p.name || id);
+      names.maybe.push({ id, name: p.name || id });
     }
   }
   if (myId && !seen.has(myId) && myName) {
     const inWindow = !windowId || myWindows.includes(windowId) || myWindows.length === 0;
     if (myStatus === "yes" && inWindow) {
       yes += 1;
-      names.yes.push(myName);
+      names.yes.push({ id: myId, name: myName });
     } else if (myStatus === "maybe" && inWindow) {
       maybe += 1;
-      names.maybe.push(myName);
+      names.maybe.push({ id: myId, name: myName });
     }
   }
   return { yes, maybe, names };
@@ -390,6 +396,18 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   });
   form.querySelectorAll("article.day").forEach((card) => paintLiveDay(card, avail, roster));
   form.addEventListener("click", (e) => {
+    const act = e.target.closest("[data-admin-sign], [data-admin-drop]");
+    if (act) {
+      const card = act.closest("article.day");
+      const day = card.dataset.day;
+      const on = !!act.dataset.adminSign;
+      const id = act.dataset.adminSign || act.dataset.adminDrop;
+      const windows = on ? [...card.querySelectorAll(`input[name="w-${day}"]`)].map((i) => i.value) : [];
+      api.send("/api/availability/" + id, "PUT", { days: { [day]: { status: on ? "yes" : "no", windows } }, kind: page.kind })
+        .then(() => redraw(sessionPlayerId(roster.players), true, card.dataset.date))
+        .catch((err) => alert(err.message));
+      return;
+    }
     const win = e.target.closest(".win-count");
     if (win) {
       const card = win.closest("article.day");
@@ -443,7 +461,9 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     });
   }
   const date = new URLSearchParams((location.hash.split("?")[1] || "")).get("date");
-  const card = date && document.querySelector(`article.day[data-date="${date}"]`);
+  const next = date ? null : firstWindowOffer(avail);
+  const card = (date && document.querySelector(`article.day[data-date="${date}"]`))
+    || (next && document.querySelector(`article.day[data-date="${next.date}"]`));
   if (card) {
     const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
     if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, false);

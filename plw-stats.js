@@ -89,8 +89,8 @@ function mergeKind(leagueRows, tourneyRows, players) {
   return { rows: Object.values(byId), usedLeague };
 }
 
-async function getPlwStats(players) {
-  if (cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
+async function getPlwStats(players, force) {
+  if (!force && cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
   const [bL, bT, pL, pT] = await Promise.all([
     fetchTable(BATTER_URL, SEASONS[0].id, CELL_KEYS),
     fetchTable(BATTER_URL, SEASONS[1].id, CELL_KEYS),

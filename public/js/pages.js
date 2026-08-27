@@ -374,12 +374,12 @@ function tallySlot(avail, day, windowId) {
     const inWindow = !windowId || (entry.windows || []).includes(windowId) || (entry.windows || []).length === 0;
     if (entry.status === "yes" && inWindow) {
       yes += 1;
-      names.yes.push(p.name || id);
+      names.yes.push({ id, name: p.name || id });
     } else if (entry.status === "maybe" && inWindow) {
       maybe += 1;
-      names.maybe.push(p.name || id);
+      names.maybe.push({ id, name: p.name || id });
     } else {
-      names.no.push(p.name || id);
+      names.no.push({ id, name: p.name || id });
     }
   }
   return { yes, maybe, names };
@@ -399,7 +399,7 @@ function bestUpcomingMatchup(events, book) {
     if (!name || typeof matchupFavor !== "function") continue;
     const fav = matchupFavor({ note: "vs " + name }, book);
     if (fav == null) continue;
-    if (!best || fav > best.fav) best = { name, fav, date: e.date };
+    if (!best || fav < best.fav) best = { name, fav, date: e.date };
   }
   if (!best) return "";
   const word = typeof favorWord === "function" ? favorWord(best.fav) : "";

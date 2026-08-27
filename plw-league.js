@@ -236,8 +236,8 @@ function groupTeams(batters, pitchers) {
   }));
 }
 
-async function getPlwLeagueBook() {
-  if (cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
+async function getPlwLeagueBook(force) {
+  if (!force && cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
   const [batters, pitchers, standHtml] = await Promise.all([
     fetchTable(BATTER_URL, CELL_KEYS),
     fetchTable(PITCHER_URL, PITCH_KEYS),
@@ -336,9 +336,9 @@ function stampTourney(teams) {
   return teams.map((t) => ({ ...t, book: "tourney", note: "" }));
 }
 
-async function loadSeasonTeams(seasonId) {
+async function loadSeasonTeams(seasonId, force) {
   const hit = seasonBooks[seasonId];
-  if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.teams;
+  if (!force && hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.teams;
   const [batters, pitchers, standHtml] = await Promise.all([
     fetchTable(BATTER_BASE + seasonId, CELL_KEYS),
     fetchTable(PITCHER_BASE + seasonId, PITCH_KEYS),
@@ -370,17 +370,17 @@ async function loadSeasonTeams(seasonId) {
   return teams;
 }
 
-async function getPlwTourneyBook(eventId) {
+async function getPlwTourneyBook(eventId, force) {
   const id = TOURNEY_EVENTS.some((e) => e.id === eventId) ? eventId : "overall";
   const hit = tourneyPack[id];
-  if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.data;
+  if (!force && hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.data;
   const ev = TOURNEY_EVENTS.find((e) => e.id === id);
   const events = eventMeta();
   let teams = [];
   let season = ev && ev.season;
   let note = ev && ev.season ? "Posted PLW board for this event." : "No PLW board posted for this event yet.";
   if (id === "overall") {
-    const books = await Promise.all(TOURNEY_EVENTS.filter((e) => e.season).map((e) => loadSeasonTeams(e.season)));
+    const books = await Promise.all(TOURNEY_EVENTS.filter((e) => e.season).map((e) => loadSeasonTeams(e.season, force)));
     teams = stampTourney(groupTeams(mergePlayers(flattenKind(books, "batters"), false), mergePlayers(flattenKind(books, "pitchers"), true)));
     const rec = mergeRecords(books);
     for (const t of teams) {
@@ -390,7 +390,7 @@ async function getPlwTourneyBook(eventId) {
     season = TOURNEY;
     note = "Tally of every posted tournament, ranked by W-L. Pick an event for that day’s board.";
   } else if (ev && ev.season) {
-    teams = await loadSeasonTeams(ev.season);
+    teams = await loadSeasonTeams(ev.season, force);
   }
   const data = {
     book: "tourney",
@@ -427,16 +427,16 @@ function emptyLineup() {
 }
 
 function attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson }) {
-  app.get("/api/plw-league", requireTeam, async (_req, res) => {
+  app.get("/api/plw-league", requireTeam, async (req, res) => {
     try {
-      res.json(await getPlwLeagueBook());
+      res.json(await getPlwLeagueBook(req.query.refresh === "1"));
     } catch (err) {
       res.status(502).json({ error: String(err.message || err), teams: [] });
     }
   });
   app.get("/api/plw-tourney", requireTeam, async (req, res) => {
     try {
-      res.json(await getPlwTourneyBook(req.query.event));
+      res.json(await getPlwTourneyBook(req.query.event, req.query.refresh === "1"));
     } catch (err) {
       res.status(502).json({ error: String(err.message || err), teams: [] });
     }
@@ -477,6 +477,7 @@ function attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson }
 
 module.exports = {
   attachPlwLeague,
+  getPlwTourneyBook,
   getPlwLeagueBook,
   fetchTable,
   groupTeams,

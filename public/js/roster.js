@@ -59,7 +59,7 @@ function rosterRows(players, squad) {
     .join("");
 }
 
-const FIELD_POS = ["P", "2B", "SS", "IF", "LF", "CF", "RF", "OF", "Util"];
+const FIELD_POS = ["P", "3B", "SS", "2B", "IF", "LF", "CF", "RF", "OF", "Util"];
 
 function posPickerHtml(selected) {
   selected = (selected || []).filter((p) => FIELD_POS.includes(p));
@@ -127,6 +127,44 @@ function posEditorHtml(p) {
   </form>`;
 }
 
+function canEditPos() {
+  return typeof isAdmin === "function" && isAdmin();
+}
+
+function bindPosEditor(root, roster, onSaved) {
+  if (!root || !canEditPos()) return;
+  root.querySelectorAll("[data-edit-pos]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.editPos;
+      const list = root.querySelector(".roster-list") || root;
+      const row = btn.closest(".roster-row");
+      const open = list.querySelector(`.pos-inline[data-id="${id}"]`);
+      list.querySelectorAll(".pos-inline").forEach((el) => el.remove());
+      if (open) return;
+      const p = roster.players.find((x) => x.id === id);
+      if (!p) return;
+      if (row) row.insertAdjacentHTML("afterend", posEditorHtml(p));
+      else list.insertAdjacentHTML("beforeend", posEditorHtml(p));
+      const form = list.querySelector(`.pos-inline[data-id="${id}"]`);
+      if (!form) return;
+      bindPosPicker(form);
+      form.querySelector("[data-pos-cancel]").addEventListener("click", () => form.remove());
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const note = form.querySelector(".pos-msg");
+        try {
+          const next = await api.send("/api/roster/" + id + "/positions", "PUT", { positions: readPosPicker(form) });
+          roster.players = next.players || roster.players;
+          onSaved();
+        } catch (err) {
+          if (note) note.textContent = err.message;
+        }
+      });
+    });
+  });
+}
+
 function pitcherKey(squad) {
   return "wizardsPitcher-" + (squad === "tournament" ? "tournament" : "league");
 }
@@ -143,28 +181,32 @@ function pickPitcherId(players, squad) {
 }
 
 function fieldLayout(players, pitcherId) {
-  const FIELD = ["CF", "LF", "RF", "SS", "2B"];
-  const IF_FIRST = ["SS", "2B", "CF", "LF", "RF"];
+  const FIELD = ["CF", "LF", "3B", "SS", "2B/RF"];
+  const IF_FIRST = ["3B", "SS", "2B/RF", "CF", "LF"];
   const spots = [
     { key: "CF", left: "50%", top: "10%" },
     { key: "LF", left: "16%", top: "22%" },
-    { key: "RF", left: "84%", top: "22%" },
-    { key: "SS", left: "32%", top: "40%" },
-    { key: "2B", left: "68%", top: "40%" },
+    { key: "3B", left: "18%", top: "48%" },
+    { key: "SS", left: "38%", top: "36%" },
+    { key: "2B/RF", left: "72%", top: "32%" },
     { key: "P", left: "50%", top: "58%" },
   ];
   const pitcher = players.find((p) => p.id === pitcherId) || pitcherArms(players)[0];
   const others = players.filter((p) => p.id !== (pitcher && pitcher.id));
   const extras = pitcherArms(players).filter((p) => !pitcher || p.id !== pitcher.id);
-  const at = {
-    CF: [],
-    LF: [],
-    RF: [],
-    SS: [],
-    "2B": [],
-    P: pitcher ? [pitcher, ...extras] : extras.slice(),
-  };
-  const cover = (pos) => (pos === "P" ? [] : pos === "IF" ? ["2B", "SS"] : pos === "OF" ? ["LF", "CF", "RF"] : FIELD.includes(pos) ? [pos] : []);
+  const at = { CF: [], LF: [], "3B": [], SS: [], "2B/RF": [], P: pitcher ? [pitcher, ...extras] : extras.slice() };
+  const cover = (pos) =>
+    pos === "P"
+      ? []
+      : pos === "IF"
+        ? ["3B", "SS", "2B/RF"]
+        : pos === "OF"
+          ? ["LF", "CF", "2B/RF"]
+          : pos === "2B" || pos === "RF"
+            ? ["2B/RF"]
+            : FIELD.includes(pos)
+              ? [pos]
+              : [];
   for (const p of others) {
     (p.positions || []).forEach((pos, idx) => {
       for (const spot of cover(pos)) {
@@ -194,7 +236,7 @@ function fieldLayout(players, pitcherId) {
   return { spots: spots.map((s) => ({ ...s, here: at[s.key] })), bench: pool };
 }
 
-function rosterDiamond(players, svgId, marks, offer, pitcherId) {
+function rosterDiamond(players, svgId, marks, offer, pitcherId, extraBench) {
   const { spots, bench } = fieldLayout(players, pitcherId);
   const diamondSpots = spots
     .map((spot) => {
@@ -211,14 +253,20 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId) {
           if (spot.key === "P") {
             return `<b class="${cls}" data-pitcher="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(p.name)}</b>`;
           }
-          return `<b class="${cls}">${escapeHtml(p.name)}</b>`;
+          return canEditPos()
+            ? `<b class="${cls}" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(p.name)}</b>`
+            : `<b class="${cls}">${escapeHtml(p.name)}</b>`;
         })
         .join("");
       return `<div class="spot${glow}" style="left:${spot.left};top:${spot.top}"><small>${spot.key}</small>${names}</div>`;
     })
     .join("");
-  const benchHtml = bench
-    .map((p) => `<span class="chip ${marks[p.id] || ""}">${escapeHtml(p.name)}</span>`)
+  const benchHtml = bench.concat(extraBench || [])
+    .map((p) =>
+      canEditPos()
+        ? `<span class="chip ${marks[p.id] || ""}" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(p.name)}</span>`
+        : `<span class="chip ${marks[p.id] || ""}">${escapeHtml(p.name)}</span>`
+    )
     .join("");
   const when = offer
     ? new Date(offer.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
@@ -227,8 +275,8 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId) {
   const note = !players.length
     ? `<p class="muted">Select a date to see that night's potential roster.</p>`
     : mound
-    ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Green is committed, gold is maybe.</p>`
-    : `<p class="muted">Bench / unassigned</p>`;
+      ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Green is committed, gold is maybe.</p>`
+      : `<p class="muted">3B, SS, 2B/RF, LF, CF, and P.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Green is committed, gold is maybe.</p>`;
   return `
     <div class="diamond-card card">
       <p class="kicker">Defense</p>
@@ -239,9 +287,7 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId) {
               <stop stop-color="#c026ff"/><stop offset="1" stop-color="#22d3ee"/>
             </linearGradient>
           </defs>
-          <path d="M8 58 Q50 4 92 58" fill="none" stroke="rgba(34,211,238,0.28)" stroke-width="1.2"/>
           <path d="M50 88 L82 56 L50 28 L18 56 Z" fill="rgba(192,38,255,0.08)" stroke="url(#${svgId})" stroke-width="1.4"/>
-          <circle cx="50" cy="58" r="5" fill="none" stroke="#22d3ee" stroke-width="1.1"/>
           <path d="M18 56 L50 88 L82 56" fill="none" stroke="rgba(240,193,75,0.45)" stroke-width="0.8"/>
         </svg>
         ${diamondSpots}
@@ -277,36 +323,41 @@ function renderEmptyNightDiamond() {
 
 function renderNightDiamond(roster, avail, offer, day, kind, liveStatus) {
   const { players, marks } = nightMarks(roster, avail, day, liveStatus);
+  const sit = new Set(((avail.sit || {})[day] || []));
+  const fielded = players.filter((p) => !sit.has(p.id));
+  const sat = players.filter((p) => sit.has(p.id));
   const squad = kind === "tournament" ? "tournament" : "league";
-  const pitcherId = pickPitcherId(players, squad);
-  const rows = players
-    .map((p) => {
-      const pos = (p.positions || []).join(", ") || "Util";
-      return `<div class="roster-row"><strong>${escapeHtml(p.name)}</strong><span class="num">${p.number != null ? "#" + p.number : "—"}</span><span class="tag">${escapeHtml(pos)}</span><span class="muted">${marks[p.id] === "maybe" ? "maybe" : "yes"}</span></div>`;
-    })
-    .join("");
+  const pitcherId = pickPitcherId(fielded, squad);
+  const tip = canEditPos()
+    ? "Tap a name or position tag to edit. Bench sits them. ↑ ↓ changes batting order. Mound tap switches pitcher."
+    : "Empty spots still need a body.";
   return `
-    <div id="avail-diamond" data-day="${escapeHtml(day)}">
-      <div id="night-scout-host"></div>
-      <p class="muted" style="margin:1rem 0 0.4rem">Yes and maybe for this date. Empty spots still need a body.</p>
+    <div id="avail-diamond" data-day="${escapeHtml(day)}" data-kind="${escapeHtml(kind)}">
+      <p class="muted" style="margin:1rem 0 0.4rem">Yes and maybe for this date. ${tip}</p>
       <div class="roster-layout">
-        ${rosterDiamond(players, "dg-avail", marks, offer, pitcherId)}
-        <div class="roster-list" id="night-lineup-list">${rows || '<p class="muted">Nobody marked yes or maybe yet.</p>'}</div>
+        ${rosterDiamond(fielded, "dg-avail", marks, offer, pitcherId, sat)}
+        <div class="roster-list" id="night-lineup-list">${players.length ? "" : '<p class="muted">Nobody marked yes or maybe yet.</p>'}</div>
       </div>
+      <div id="night-scout-host"></div>
       <div id="night-opp-host"></div>
     </div>`;
 }
 
 function bindNightDiamond(roster, avail, kind, offer) {
+  const refresh = () => {
+    const host = document.getElementById("avail-diamond");
+    const card = host && document.querySelector(`article.day[data-day="${host.dataset.day}"]`);
+    if (card) paintAvailDiamond(card, roster, avail, kind, offer, false);
+  };
   document.querySelectorAll("#avail-diamond [data-pitcher]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const squad = kind === "tournament" ? "tournament" : "league";
       localStorage.setItem(pitcherKey(squad), btn.dataset.pitcher);
-      const host = document.getElementById("avail-diamond");
-      const card = host && document.querySelector(`article.day[data-day="${host.dataset.day}"]`);
-      if (card) paintAvailDiamond(card, roster, avail, kind, offer, false);
+      refresh();
     });
   });
+  bindPosEditor(document.querySelector("#avail-diamond .diamond-card"), roster, refresh);
+  bindPosEditor(document.getElementById("night-lineup-list"), roster, refresh);
 }
 
 function paintAvailDiamond(card, roster, avail, kind, offer, toggle) {
@@ -335,8 +386,18 @@ function paintAvailDiamond(card, roster, avail, kind, offer, toggle) {
   show(renderNightDiamond(roster, avail, offer, day, kind, live));
   bindNightDiamond(roster, avail, kind, offer);
   const { players, marks } = nightMarks(roster, avail, day, live);
-  if (kind !== "practice" && typeof paintNightLineup === "function") paintNightLineup(players, marks);
-  if (kind === "league" && typeof loadNightMatchup === "function") {
+  if (typeof paintNightLineup === "function") {
+    const reload = (next) => {
+      if (next && next.sit) avail.sit = next.sit;
+      if (next && next.order) avail.order = next.order;
+      const box = document.querySelector(`article.day[data-day="${day}"]`);
+      if (box) paintAvailDiamond(box, roster, avail, kind, offer, false);
+    };
+    Promise.resolve(paintNightLineup(players, marks, (avail.sit || {})[day] || [], reload, (avail.order || {})[day] || [])).then(() =>
+      bindPosEditor(document.getElementById("night-lineup-list"), roster, () => reload())
+    );
+  }
+  if ((kind === "league" || kind === "tournament") && typeof loadNightMatchup === "function") {
     loadNightMatchup(offer, players.filter((p) => marks[p.id] === "yes").map((p) => p.name));
   }
 }
@@ -427,36 +488,9 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
       }
     });
   });
-  document.querySelectorAll("[data-edit-pos]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.editPos;
-      const list = btn.closest(".roster-list");
-      const row = btn.closest(".roster-row");
-      if (!list || !row) return;
-      const open = list.querySelector(`.pos-inline[data-id="${id}"]`);
-      list.querySelectorAll(".pos-inline").forEach((el) => el.remove());
-      if (open) return;
-      const p = roster.players.find((x) => x.id === id);
-      if (!p) return;
-      row.insertAdjacentHTML("afterend", posEditorHtml(p));
-      const form = list.querySelector(`.pos-inline[data-id="${id}"]`);
-      if (!form) return;
-      bindPosPicker(form);
-      form.querySelector("[data-pos-cancel]").addEventListener("click", () => form.remove());
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const note = form.querySelector(".pos-msg");
-        const positions = readPosPicker(form);
-        try {
-          const next = await api.send("/api/roster/" + id + "/positions", "PUT", { positions });
-          roster.players = next.players || roster.players;
-          const box = document.getElementById("roster-embed");
-          redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
-        } catch (err) {
-          if (note) note.textContent = err.message;
-        }
-      });
-    });
+  bindPosEditor(document.getElementById("roster-embed"), roster, () => {
+    const box = document.getElementById("roster-embed");
+    redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
   });
   bindPhones(roster);
   if (typeof loadOffense === "function") loadOffense(roster);

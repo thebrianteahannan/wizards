@@ -5,6 +5,7 @@ const { attachAuth, requireTeam, requireAdmin, resolvePlayer } = require("./acco
 const { attachRecruitActions } = require("./recruit-actions");
 const { getPlwStats } = require("./plw-stats");
 const { attachPlwLeague } = require("./plw-league");
+const { attachNightSit } = require("./night-sit");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -167,8 +168,17 @@ app.get("/api/activity", requireTeam, async (_req, res) => {
 });
 
 app.put("/api/availability/:playerId", requireTeam, async (req, res) => {
-  const player = await playerOrFail(req, res);
-  if (!player) return;
+  let player = await resolvePlayer(req.user);
+  if (req.params.playerId && (!player || req.params.playerId !== player.id)) {
+    if (req.user.role !== "admin" && (!player || player.role !== "Co-manager")) {
+      return res.status(403).json({ error: "Managers only" });
+    }
+    const { map } = await rosterById();
+    player = map[req.params.playerId];
+    if (!player) return res.status(404).json({ error: "Unknown player" });
+  } else if (!player) {
+    return res.status(400).json({ error: "Your login is not linked to a roster name. Ask a manager." });
+  }
 
   const days = req.body && req.body.days;
   if (!days || typeof days !== "object") {
@@ -312,12 +322,12 @@ app.get("/api/contacts", requireTeam, async (_req, res) => {
   res.json(await readJson("contacts.json"));
 });
 
-const JOIN_POS = ["P", "2B", "SS", "IF", "LF", "CF", "RF", "OF", "Util"];
+const JOIN_POS = ["P", "3B", "SS", "2B", "IF", "LF", "CF", "RF", "OF", "Util"];
 
-app.get("/api/plw-stats", async (_req, res) => {
+app.get("/api/plw-stats", async (req, res) => {
   try {
     const roster = await readJson("roster.json");
-    res.json(await getPlwStats(roster.players));
+    res.json(await getPlwStats(roster.players, req.query.refresh === "1"));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err), batters: [], pitchers: [] });
   }
@@ -431,6 +441,7 @@ attachRecruitActions(app, {
   positions: JOIN_POS,
 });
 attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson });
+attachNightSit(app, { readJson, writeJson, requireAdmin });
 
 const FEE_MODELS = ["flat", "split", "core", "play"];
 

@@ -227,25 +227,53 @@ function nightGrade(n, title, star) {
   return n == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(n)}" title="${title}">${n}${star ? "*" : ""}</b>`;
 }
 
-function nightPlayerRow(p, marks, hole, bat, pit, batStar, pitStar) {
+function applyNightOrder(starters, customIds, stats) {
+  if (!customIds || !customIds.length) return classicBattingOrder({ players: starters }, stats);
+  const byId = {};
+  for (const p of starters) byId[p.id] = p;
+  const seen = new Set();
+  const list = [];
+  for (const id of customIds) {
+    if (byId[id] && !seen.has(id)) {
+      seen.add(id);
+      list.push(byId[id]);
+    }
+  }
+  const leftover = starters.filter((p) => !seen.has(p.id));
+  if (leftover.length) list.push(...classicBattingOrder({ players: leftover }, stats));
+  return list;
+}
+
+function nightPlayerRow(p, marks, hole, bat, pit, batStar, pitStar, onBench) {
   const pos = (p.positions || []).join(", ") || "Util";
   const holeHtml = hole ? `<small class="muted" style="display:block;font-size:0.62rem">${escapeHtml(hole)}</small>` : "";
-  return `<div class="roster-row" style="grid-template-columns:4.6rem 2.4rem 2.4rem minmax(0,1fr) 2.8rem 4.4rem 3.2rem">
+  const edit = typeof canEditPos === "function" && canEditPos();
+  const btn = 'class="btn ghost" style="padding:0.08rem 0.32rem;font-size:0.62rem"';
+  const arrows = edit && !onBench
+    ? `<span><button type="button" ${btn} data-night-up="${escapeHtml(p.id)}">↑</button><button type="button" ${btn} data-night-down="${escapeHtml(p.id)}">↓</button></span>`
+    : edit ? "<span></span>" : "";
+  const move = edit
+    ? `<button type="button" ${btn} data-${onBench ? "unsit" : "sit"}="${escapeHtml(p.id)}">${onBench ? "Start" : "Bench"}</button>`
+    : "";
+  return `<div class="roster-row"${onBench ? "" : ` data-night-bat="${escapeHtml(p.id)}"`} style="grid-template-columns:3.6rem 2.2rem 2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem${edit ? " 3.4rem 3.2rem" : ""}">
     <span class="num">${holeHtml}</span>
     <span class="num">${nightGrade(bat, "Hit rating", batStar)}</span>
     <span class="num">${nightGrade(pit, "Pitch rating", pitStar)}</span>
-    <strong>${escapeHtml(p.name)}</strong>
+    <strong style="white-space:normal;overflow:visible">${escapeHtml(p.name)}${marks[p.id] === "maybe" ? ' <span class="muted">maybe</span>' : ""}</strong>
     <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
-    <span class="tag">${escapeHtml(pos)}</span>
-    <span class="muted">${marks[p.id] === "maybe" ? "maybe" : "yes"}</span>
+    ${edit
+      ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit;white-space:nowrap">${escapeHtml(pos)}</button>`
+      : `<span class="tag">${escapeHtml(pos)}</span>`}
+    ${arrows}${move}
   </div>`;
 }
 
-async function paintNightLineup(players, marks) {
+async function paintNightLineup(players, marks, sit, onSit, customIds) {
   const list = document.getElementById("night-lineup-list");
   if (!list || !players.length) return;
   try {
     const stats = await api.get("/api/plw-stats");
+    const parked = new Set(sit || []);
     const ranked = players.slice().sort((a, b) => {
       const ya = marks[a.id] === "yes" ? 1 : 0;
       const yb = marks[b.id] === "yes" ? 1 : 0;
@@ -257,23 +285,52 @@ async function paintNightLineup(players, marks) {
       if (rb == null) return -1;
       return rb - ra;
     });
-    const starters = ranked.slice(0, 6);
-    const bench = ranked.slice(6);
-    const ordered = classicBattingOrder({ players: starters }, stats);
+    const starters = ranked.filter((p) => !parked.has(p.id)).slice(0, 6);
+    const startIds = new Set(starters.map((p) => p.id));
+    const bench = ranked.filter((p) => !startIds.has(p.id));
+    const ordered = applyNightOrder(starters, customIds, stats);
     const holes = ["Lead", "2", "3", "Cleanup", "5", "6"];
-    const cols = "4.6rem 2.4rem 2.4rem minmax(0,1fr) 2.8rem 4.4rem 3.2rem";
-    const rowOf = (p, hole) => {
+    const edit = typeof canEditPos === "function" && canEditPos();
+    const cols = "3.6rem 2.2rem 2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem" + (edit ? " 3.4rem 3.2rem" : "");
+    const rowOf = (p, hole, onBench) => {
       const hit = batterRow(stats, p);
       const arm = typeof pitcherRow === "function" ? pitcherRow(stats, p) : null;
       const fromTourney = (row) => /tourney/i.test(String((row && row.source) || ""));
-      return nightPlayerRow(p, marks, hole, hitterRating(hit), typeof pitchRating === "function" ? pitchRating(arm) : null, fromTourney(hit), fromTourney(arm));
+      return nightPlayerRow(p, marks, hole, hitterRating(hit), typeof pitchRating === "function" ? pitchRating(arm) : null, fromTourney(hit), fromTourney(arm), onBench);
     };
-    let html = `<div class="roster-row" style="grid-template-columns:${cols}"><span></span><span class="num muted" style="font-size:0.62rem">BAT</span><span class="num muted" style="font-size:0.62rem">PIT</span><span></span><span></span><span></span><span></span></div>`;
-    html += ordered.map((p, i) => rowOf(p, holes[i] || String(i + 1))).join("");
+    let html = "";
+    if (edit) {
+      html += `<p class="muted" style="margin:0 0 0.35rem">↑ ↓ overrides auto order for this date.${customIds && customIds.length ? ' <button type="button" class="btn ghost" data-night-auto style="padding:0.08rem 0.4rem;font-size:0.62rem">Auto</button>' : ""}</p>`;
+    }
+    html += `<div class="roster-row" style="grid-template-columns:${cols}"><span></span><span class="num muted" style="font-size:0.62rem">BAT</span><span class="num muted" style="font-size:0.62rem">PIT</span><span></span><span></span><span></span>${edit ? "<span></span><span></span>" : ""}</div>`;
+    html += ordered.map((p, i) => rowOf(p, holes[i] || String(i + 1), false)).join("");
     if (bench.length) {
       html += `<div style="border-top:1px solid var(--line);margin:0.55rem 0 0.4rem"></div><p class="kicker" style="margin:0 0 0.3rem">Bench</p>`;
-      html += bench.map((p) => rowOf(p, "")).join("");
+      html += bench.map((p) => rowOf(p, "", true)).join("");
     }
     list.innerHTML = html;
+    const host = document.getElementById("avail-diamond");
+    const sendNight = async (path, body) => {
+      const next = await api.send(path, "PUT", { kind: host && host.dataset.kind, day: host && host.dataset.day, ...body });
+      if (onSit) onSit(next);
+    };
+    list.querySelectorAll("[data-sit], [data-unsit]").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        sendNight("/api/sit", { playerId: btn.dataset.sit || btn.dataset.unsit, sit: !!btn.dataset.sit }).catch((err) => alert(err.message))
+      );
+    });
+    const ids = () => [...list.querySelectorAll("[data-night-bat]")].map((el) => el.dataset.nightBat);
+    const bump = (id, dir) => {
+      const row = ids();
+      const i = row.indexOf(id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= row.length) return;
+      [row[i], row[j]] = [row[j], row[i]];
+      sendNight("/api/order", { order: row }).catch((err) => alert(err.message));
+    };
+    list.querySelectorAll("[data-night-up]").forEach((btn) => btn.addEventListener("click", () => bump(btn.dataset.nightUp, -1)));
+    list.querySelectorAll("[data-night-down]").forEach((btn) => btn.addEventListener("click", () => bump(btn.dataset.nightDown, 1)));
+    const auto = list.querySelector("[data-night-auto]");
+    if (auto) auto.addEventListener("click", () => sendNight("/api/order", { order: [] }).catch((err) => alert(err.message)));
   } catch (err) {}
 }

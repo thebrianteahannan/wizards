@@ -367,3 +367,64 @@ function bindTourneyScout(event) {
     });
   });
 }
+
+function tourneyGames(offer) {
+  const d = offer && (offer.date || offer.day);
+  if (d === "2026-08-29") {
+    return [
+      { time: "10:00 AM", field: "Grass Field", vs: "Marauders" },
+      { time: "11:00 AM", field: "Main Field", vs: "Blitz" },
+      { time: "2:00 PM", field: "Main Field", vs: "Savages" },
+    ];
+  }
+  return [];
+}
+
+function renderTourneyPack() {
+  return `
+    <section class="card" style="margin-top:1rem">
+      <p class="kicker">Aug 29 · End of Summer Showdown</p>
+      <h2>Pools and schedule</h2>
+      <p class="muted">Pool B: Blitz, Savages, Wizards, Marauders. We play Marauders 10 AM Grass, Blitz 11 AM Main, Savages 2 PM Main. Playoffs 3–5 PM on turf.</p>
+      <img src="/media/eos-showdown-pools.jpg?v=3" alt="August 29 tournament pools and schedule" style="width:100%;max-width:40rem;height:auto;border-radius:10px;margin:0.55rem 0 0;display:block" />
+    </section>`;
+}
+
+async function fillTourneyMatchups(host, offer, oursNames) {
+  const games = tourneyGames(offer);
+  if (!host || !games.length) return false;
+  host.innerHTML = `<div class="diamond-card card" style="margin-top:1rem"><p class="muted">Loading Pool B matchups from tournament boards…</p></div>`;
+  try {
+    const [data, league] = await Promise.all([
+      api.get("/api/plw-tourney?event=overall"),
+      api.get("/api/plw-league").catch(() => ({ teams: [] })),
+    ]);
+    const book = (data && data.teams) || [];
+    const lg = {};
+    for (const t of (league && league.teams) || []) lg[t.code] = t;
+    for (const t of book) {
+      if (!lg[t.code]) continue;
+      t.lw = lg[t.code].w;
+      t.ll = lg[t.code].l;
+    }
+    const pitFill = leaguePitAvg(book);
+    const ranked = rankedTeams(book);
+    const us = ranked.find((t) => t.code === "WIZ");
+    const usRank = us ? ranked.findIndex((t) => t.code === "WIZ") + 1 : "—";
+    host.innerHTML =
+      renderTourneyPack() +
+      games
+        .map((g) => {
+          const them = matchScoutTeam(ranked, g.vs);
+          if (!us || !them) {
+            return `<div class="diamond-card card" style="margin-top:1rem"><p class="kicker">${escapeHtml(g.time)} · ${escapeHtml(g.field)}</p><h2>vs ${escapeHtml(g.vs)}</h2><p class="muted">No tournament board for ${escapeHtml(g.vs)} yet.</p></div>`;
+          }
+          const themRank = ranked.findIndex((t) => t.code === them.code) + 1;
+          return `<p class="kicker" style="margin:1.1rem 0 0">${escapeHtml(g.time)} · ${escapeHtml(g.field)}</p>${renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames || [], null, offer)}`;
+        })
+        .join("");
+  } catch (err) {
+    host.innerHTML = `<div class="diamond-card card" style="margin-top:1rem"><p class="muted">${escapeHtml(err.message || "Could not load tournament boards.")}</p></div>`;
+  }
+  return true;
+}

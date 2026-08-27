@@ -232,7 +232,7 @@ function teamMarks(team, pitFill) {
   if (fillPit) pit = pitFill;
   const starPit = leagueWiz && (!!team.note || fillPit);
   const all = bat != null && pit != null ? Math.round(0.55 * bat + 0.45 * pit) : bat != null ? bat : pit;
-  return { bat, pit, all, starBat, starPit };
+  return { bat, pit, all, starBat, starPit, w: team.w, l: team.l };
 }
 
 function markCell(n, star) {
@@ -358,14 +358,29 @@ function beatTips(us, them, um, tm, usRank, themRank, book, extra) {
   return typeof beatPlan === "function" ? beatPlan(us, them, um, tm, usRank, themRank, book, extra) : [];
 }
 
+function recPct(m) {
+  const g = (Number(m && m.w) || 0) + (Number(m && m.l) || 0);
+  return g ? (Number(m.w) || 0) / g : 0;
+}
+
 function favorScore(um, tm) {
   if (um.bat == null && um.pit == null) return null;
   const bats = (um.bat || 50) - (tm.pit || 50);
   const arms = (um.pit || 50) - (tm.bat || 50);
-  return Math.max(1, Math.min(99, Math.round(50 + 0.55 * bats + 0.45 * arms)));
+  const rec = recPct(tm) - recPct(um);
+  return Math.max(1, Math.min(99, Math.round(50 - 0.55 * bats - 0.45 * arms + 14 * rec)));
 }
 
-function favorWord(n) { return n >= 70 ? "Favorable" : n >= 50 ? "Even" : "Tough"; }
+function favorWord(n) { return n >= 55 ? "Tough" : n <= 45 ? "Easier" : "Even"; }
+function favorTone(n) { return n >= 55 ? "color:#fb7185" : n <= 45 ? "color:var(--go)" : "color:var(--cyan)"; }
+
+function matchupWl(t) {
+  if (!t) return { text: "—", title: "League record" };
+  if (t.lw != null || t.ll != null) return { text: (t.lw || 0) + "-" + (t.ll || 0), title: "League record" };
+  if (t.book !== "tourney" && (t.w != null || t.l != null)) return { text: (t.w || 0) + "-" + (t.l || 0), title: "League record" };
+  if (t.w != null || t.l != null) return { text: (t.w || 0) + "-" + (t.l || 0), title: "Tournament record — no league games posted" };
+  return { text: "—", title: "League record" };
+}
 
 function vsPick(rows, fn) {
   return (rows || []).map((r) => ({ r, s: fn(r) })).sort((a, b) => (a.s == null) - (b.s == null) || (b.s || 0) - (a.s || 0)).slice(0, 6);
@@ -390,16 +405,19 @@ function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames, lin
   const tips = beatTips(us, them, um, tm, usRank, themRank, book, { lineup: posted, oursNames })
     .map((t) => `<li>${escapeHtml(t)}</li>`)
     .join("");
-  const cols = "6.5rem 3.4rem 3.4rem 3.4rem 2.6rem";
-  const line = (name, m, rank, star) =>
-    `<div class="roster-row" style="grid-template-columns:${cols};justify-content:start;max-width:24rem">
-      <strong>${escapeHtml(name)}</strong>
+  const cols = "minmax(5.2rem,1fr) 3.2rem 3.2rem 3.2rem 3.2rem 2.4rem";
+  const line = (team, m, rank, star) => {
+    const rec = matchupWl(team);
+    return `<div class="roster-row" style="grid-template-columns:${cols};justify-content:start;max-width:26rem">
+      <strong style="white-space:normal;overflow:visible">${escapeHtml(team.name)}</strong>
+      <span class="num" title="${escapeHtml(rec.title)}">${escapeHtml(rec.text)}</span>
       <span class="num">${markCell(m.bat, star && m.starBat)}</span>
       <span class="num">${markCell(m.pit, star && m.starPit)}</span>
       <span class="num">${markCell(m.all)}</span>
       <span class="num muted">#${rank}</span>
     </div>`;
-  const favHtml = fav == null ? "" : `<span class="num" title="Matchup favorability" style="text-align:right"><small class="muted" style="display:block;font-size:0.62rem">${escapeHtml(favorWord(fav))}</small><b style="${ratingTone(fav)}">${fav}</b></span>`;
+  };
+  const favHtml = fav == null ? "" : `<span class="num" title="Matchup difficulty — higher is harder" style="text-align:right"><small style="display:block;font-size:0.62rem;${favorTone(fav)}">${escapeHtml(favorWord(fav))}</small><b style="${favorTone(fav)}">${fav}</b></span>`;
   return `
     <div class="diamond-card card" style="margin-top:1rem">
       <p class="kicker">Matchup</p>
@@ -408,13 +426,13 @@ function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames, lin
         ${favHtml}
       </div>
       <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:0.85rem 1.4rem"><div class="roster-list">
-        <div class="roster-row" style="grid-template-columns:${cols};justify-content:start;max-width:24rem">
-          <span class="muted">Club</span><span class="num muted">BAT</span><span class="num muted">PIT</span><span class="num muted">ALL</span><span class="num muted">RK</span>
+        <div class="roster-row" style="grid-template-columns:${cols};justify-content:start;max-width:26rem">
+          <span class="muted">Club</span><span class="num muted">W-L</span><span class="num muted">BAT</span><span class="num muted">PIT</span><span class="num muted">ALL</span><span class="num muted">RK</span>
         </div>
-        ${line("Wizards", um, usRank, true)}
-        ${line(them.name, tm, themRank, false)}
+        ${line(us, um, usRank, true)}
+        ${line(them, tm, themRank, false)}
       </div><ul class="rules" style="margin:0;flex:1 1 16rem">${tips || "<li>Play clean. Make them beat us.</li>"}</ul></div>
-      ${typeof renderLineupBox === "function" ? renderLineupBox(them, offer, lineup) : ""}
+      ${lineup != null && typeof renderLineupBox === "function" ? renderLineupBox(them, offer, lineup) : ""}
       ${vsBoard("bats", (us.batters || []).filter((r) => oursHit(r, oursNames)), them.batters, hitterRating, us, them.name, posted)}
       ${vsBoard("arms", (us.pitchers || []).filter((r) => oursHit(r, oursNames)), them.pitchers, pitchRating, us, them.name, posted)}
     </div>`;
@@ -423,6 +441,11 @@ function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames, lin
 async function loadNightMatchup(offer, oursNames) {
   const host = document.getElementById("night-scout-host");
   if (!host) return;
+  if (typeof fillTourneyMatchups === "function" && (await fillTourneyMatchups(host, offer, oursNames))) {
+    const empty = document.getElementById("night-opp-host");
+    if (empty) empty.innerHTML = "";
+    return;
+  }
   const name = opponentName(offer);
   if (!name) {
     host.innerHTML = "";

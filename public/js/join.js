@@ -1,4 +1,4 @@
-const JOIN_POS = ["P", "2B", "SS", "IF", "LF", "CF", "RF", "OF", "Util"];
+const JOIN_POS = ["P", "3B", "SS", "2B", "IF", "LF", "CF", "RF", "OF", "Util"];
 
 function posOptions(selected) {
   return JOIN_POS.map((p) => `<option value="${p}" ${p === selected ? "selected" : ""}>${p}</option>`).join("");
@@ -98,19 +98,48 @@ function recruitActions(r) {
     <p class="muted recruit-action-msg"></p>`;
 }
 
-function renderRecruits(data, openId) {
+function foldRecruit(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+}
+
+function sameRecruit(r, p) {
+  const rf = foldRecruit(r.firstName);
+  const rl = foldRecruit(r.lastName);
+  const pf = foldRecruit(p.first);
+  const pl = foldRecruit(p.last);
+  if (!rf || !rl || !pf || !pl || rl !== pl) return false;
+  return rf === pf || rf.startsWith(pf) || pf.startsWith(rf);
+}
+
+function recruitClub(r, book) {
+  for (const t of book || []) {
+    if (t.code === "WIZ") continue;
+    for (const p of [...(t.batters || []), ...(t.pitchers || [])]) {
+      if (sameRecruit(r, p)) return t;
+    }
+  }
+  return null;
+}
+
+function renderRecruits(data, openId, book) {
+  const takenN = (data.recruits || []).filter((r) => recruitClub(r, book)).length;
   const rows = (data.recruits || [])
     .map((r) => {
       const when = r.createdAt ? fmtDate(r.createdAt.slice(0, 10)) : "";
       const pos = r.secondary ? `${escapeHtml(r.primary)} / ${escapeHtml(r.secondary)}` : escapeHtml(r.primary);
       const bits = [r.phone || "No phone", r.email, r.experience, r.notes].filter(Boolean).map((b) => escapeHtml(b));
       const open = openId === r.id;
+      const taken = recruitClub(r, book);
       return `
-      <article class="event">
+      <article class="event"${taken ? ' style="opacity:0.88"' : ""}>
         <time>#${escapeHtml(r.number)}</time>
         <div>
-          <div class="kind">${when}${pos ? " · " + pos : ""}</div>
-          <h3>${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)}</h3>
+          <div class="kind">${when}${pos ? " · " + pos : ""}${taken ? ` · <span style="color:#fb7185">On ${escapeHtml(taken.name)}</span>` : ""}</div>
+          <h3>${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)}${taken ? ` <span class="tag" style="color:#fb7185">Taken</span>` : ""}</h3>
           <p>${bits.join(" · ")} · <a href="#/recruits" class="recruit-edit" data-id="${attr(r.id)}">${open ? "Close" : "Edit"}</a></p>
           ${open ? `
           <form class="recruit-form" data-id="${attr(r.id)}">
@@ -132,7 +161,7 @@ function renderRecruits(data, openId) {
   return `
     <p class="kicker">Team only</p>
     <h1>Recruits</h1>
-    <p class="lede">People who joined or that a Wizard recruited. Add phone, email, or notes whenever you get them. ${isAdmin() ? "After you contact someone, you can move them onto the roster." : ""} ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}</p>
+    <p class="lede">People who joined or that a Wizard recruited. Add phone, email, or notes whenever you get them. ${isAdmin() ? "After you contact someone, you can move them onto the roster." : ""} ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}${takenN ? " " + takenN + (takenN === 1 ? " already on another club." : " already on other clubs.") : ""}</p>
     <div class="timeline" style="margin-top:1rem">${rows || '<p class="muted">The inbox is empty.</p>'}</div>
   `;
 }
@@ -154,14 +183,14 @@ function bindJoin() {
   });
 }
 
-function bindRecruits(data) {
+function bindRecruits(data, book) {
   document.querySelectorAll(".recruit-edit").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       const id = btn.dataset.id;
       const closing = document.querySelector(`.recruit-form[data-id="${id}"]`);
-      document.getElementById("app").innerHTML = renderRecruits(data, closing ? "" : id);
-      bindRecruits(data);
+      document.getElementById("app").innerHTML = renderRecruits(data, closing ? "" : id, book);
+      bindRecruits(data, book);
     });
   });
   document.querySelectorAll(".recruit-form").forEach((form) => {
@@ -171,8 +200,8 @@ function bindRecruits(data) {
       const body = Object.fromEntries(new FormData(form).entries());
       try {
         const next = await api.send("/api/recruits/" + form.dataset.id, "PUT", body);
-        document.getElementById("app").innerHTML = renderRecruits(next);
-        bindRecruits(next);
+        document.getElementById("app").innerHTML = renderRecruits(next, "", book);
+        bindRecruits(next, book);
       } catch (err) {
         if (msg) msg.textContent = err.message;
       }
@@ -185,8 +214,8 @@ function bindRecruits(data) {
     const msg = card && card.querySelector(".recruit-action-msg");
     try {
       const next = await api.send(path, "POST", {});
-      document.getElementById("app").innerHTML = renderRecruits(next);
-      bindRecruits(next);
+      document.getElementById("app").innerHTML = renderRecruits(next, "", book);
+      bindRecruits(next, book);
     } catch (err) {
       btn.disabled = false;
       if (msg) msg.textContent = err.message;
@@ -198,7 +227,8 @@ function bindRecruits(data) {
   });
   document.querySelectorAll("[data-recruit-roster]").forEach((btn) => {
     const card = btn.closest("article");
-    const name = card && card.querySelector("h3") ? card.querySelector("h3").textContent.trim() : "This recruit";
+    const h = card && card.querySelector("h3");
+    const name = h ? String((h.childNodes[0] && h.childNodes[0].textContent) || h.textContent).trim() : "This recruit";
     btn.addEventListener("click", () =>
       runRecruitAction(btn, "/api/recruits/" + btn.dataset.recruitRoster + "/roster", name + " will move to the roster. Continue?")
     );

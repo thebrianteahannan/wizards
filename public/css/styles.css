@@ -412,10 +412,10 @@ a.hud:hover { border-color: var(--cyan); }
 .chat-send input { flex: 1; }
 .chat-send .btn { padding-inline: 1.1rem; }
 
-.day-grid { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 0.55rem; }
+.day-grid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 0.55rem; }
 .day {
   background: rgba(5, 8, 20, 0.75); border: 1px solid var(--line); border-radius: 14px;
-  padding: 0.5rem 0.45rem 0.55rem; min-height: 0;
+  padding: 0.5rem 0.45rem 0.55rem; min-height: 0; max-width: 220px;
 }
 .day.go { border-color: var(--go); box-shadow: 0 0 22px rgba(52, 245, 160, 0.28); }
 .day.close { border-color: var(--maybe); }

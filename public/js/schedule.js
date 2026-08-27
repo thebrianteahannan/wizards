@@ -35,7 +35,7 @@ function schedFavorHtml(e, book) {
   const fav = matchupFavor({ note: "vs " + name }, book);
   if (fav == null) return "";
   const word = typeof favorWord === "function" ? favorWord(fav) : "";
-  return `<span class="num" title="Matchup favorability" style="display:block;margin-top:0.12rem;line-height:1.05;text-align:left"><small class="muted" style="display:block;font-size:0.55rem">${escapeHtml(word)}</small><b style="font-size:1.05rem;${ratingTone(fav)}">${fav}</b></span>`;
+  return `<span class="num" title="Matchup difficulty — higher is harder" style="display:block;margin-top:0.12rem;line-height:1.05;text-align:left"><small style="display:block;font-size:0.55rem;${typeof favorTone === "function" ? favorTone(fav) : ""}">${escapeHtml(word)}</small><b style="font-size:1.05rem;${typeof favorTone === "function" ? favorTone(fav) : ""}">${fav}</b></span>`;
 }
 
 function calPillBits(e, packs) {
