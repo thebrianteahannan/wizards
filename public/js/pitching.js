@@ -62,8 +62,8 @@ function pitchLine(row) {
 
 function rotationPlayers(roster, stats, customIds) {
   const byId = {};
-  for (const p of roster.players) byId[p.id] = p;
-  const arms = roster.players.filter((p) => isArm(p, pitcherRow(stats, p)));
+  for (const p of roster.players.filter(isActive)) byId[p.id] = p;
+  const arms = roster.players.filter((p) => isActive(p) && isArm(p, pitcherRow(stats, p)));
   if (customIds && customIds.length) {
     const seen = new Set();
     const list = [];
@@ -99,9 +99,8 @@ function renderPitching(roster, stats, customIds) {
         ? `<span><button type="button" class="btn ghost" data-pit-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-pit-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
       const grade = score == null ? `<span class="muted">—</span>` : `<b style="${pitchTone(score)}">${score}${/tourney/i.test(String((row && row.source) || "")) ? "*" : ""}</b>`;
-      const hole = i === 0 ? `<small class="muted" style="display:block;font-size:0.62rem">Ace</small>` : "";
       return `<div class="roster-row" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:center">
-        <span class="num">${i + 1}${hole}</span>
+        <span class="num">${i + 1}</span>
         <span class="num" title="Pitch rating">${grade}</span>
         <strong>${escapeHtml(p.name)}</strong>
         <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${pitchLine(row)}</div>

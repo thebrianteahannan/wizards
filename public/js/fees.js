@@ -24,7 +24,7 @@ function money(n) {
 
 function feeBreakdown(roster, fees) {
   const total = Number(fees.teamTotal) || 250;
-  const players = roster.players || [];
+  const players = (roster.players || []).filter(isActive);
   const model = FEE_MODELS[fees.model] ? fees.model : "flat";
   const rows = [];
 
@@ -240,6 +240,7 @@ function renderAdmin(roster, fees) {
     )
     .join("");
   const coreBoxes = roster.players
+    .filter(isActive)
     .map((p) => {
       const checked = (fees.corePlayerIds || []).includes(p.id) ? "checked" : "";
       return `<label><input type="checkbox" name="corePlayerIds" value="${p.id}" ${checked} /> ${escapeHtml(p.name)}</label>`;

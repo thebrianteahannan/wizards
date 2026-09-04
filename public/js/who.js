@@ -7,6 +7,10 @@ function writeWhoCookie(id) {
   document.cookie = "wizardsWho=" + encodeURIComponent(id) + ";path=/;max-age=31536000;SameSite=Lax";
 }
 
+function isActive(p) {
+  return String((p && p.status) || "Active").toLowerCase() !== "inactive";
+}
+
 function sessionPlayerId(players) {
   const id = (session && session.playerId) || "";
   if (!id) return "";

@@ -59,6 +59,7 @@ function adminRestChips(roster, avail, day, kind) {
   const book = kind === "league" || kind === "tournament" ? kind : "";
   const tags = (roster.players || [])
     .filter((p) => {
+      if (!isActive(p)) return false;
       const st = ((((avail.players || {})[p.id] || {}).days || {})[day] || {}).status;
       return st !== "yes" && st !== "maybe" && (!book || typeof onSquad !== "function" || onSquad(p, book));
     })

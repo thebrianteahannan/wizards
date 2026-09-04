@@ -20,7 +20,10 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
     return `<span class="spark" title="${label}"><i style="height:${pct}%"></i></span>`;
   }).join("");
   const team = isTeam();
-  const hudNight = best ? `${best.yes}/6 · ${cap(best.day)}` : "0/6";
+  const nextOffer = typeof nextProposed === "function" ? nextProposed(avail) : null;
+  const hudVs = String((nextOffer && nextOffer.note) || "").match(/\bvs\.?\s+([^·|,]+)/i);
+  const hudTally = nextOffer ? tallySlot(avail, nextOffer.day || nextOffer.date) : best;
+  const hudNight = `${(hudTally && hudTally.yes) || 0}/6${nextOffer ? " · " + (hudVs ? hudVs[1].trim() : cap(nextOffer.day)) : best ? " · " + cap(best.day) : ""}`;
   const actions = team
     ? `<a class="btn" href="#/availability">Set your days</a><a class="btn ghost" href="#/board">Announcements</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`
     : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`;
@@ -50,16 +53,16 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
         <p class="kicker">Florida Challengers League · Fall 2026</p>
         <h1>Six on.<br /><span class="grad-text">Lights out.</span></h1>
         <p class="lede">This fall is practice and tryouts. We are building the Wizards for PLW’s Real League, which starts January 2027.</p>
-        <p class="muted">Co-managers Tony Kurtanick and Brian Hannan. ${roster.players.length} on the book. Need <strong>6 players the same night</strong> to take a league game. Check out our roster below.</p>
+        <p class="muted">Co-managers Tony Kurtanick and Brian Hannan. ${roster.players.filter(isActive).length} on the book. Need <strong>6 players the same night</strong> to take a league game. Check out our roster below.</p>
         <div class="actions">
           ${actions}
         </div>
       </div>
       <div class="hero-stage">
-        <div class="hud hud-tl">
+        <a class="hud hud-tl" href="#/availability${nextOffer && nextOffer.date ? "?date=" + encodeURIComponent(nextOffer.date) : ""}">
           <small>Field status</small>
           <b><span class="ring"></span>${escapeHtml(hudNight)}</b>
-        </div>
+        </a>
         <figure class="hero-art">
           <img src="/media/jersey-mockup.jpg" alt="Wizards of Wiff pinstripe jersey mockup" />
           <figcaption>Option 5: Pinstripe Wizard Alternate — purple, gold, and smoke.</figcaption>
@@ -82,7 +85,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
       <a class="card feature" href="#/roster">
         <span class="icon">☰</span>
         <h3>Roster</h3>
-        <p class="muted">${roster.players.length} Wizards · cap 12 · need 6</p>
+        <p class="muted">${roster.players.filter(isActive).length} Wizards · cap 12 · need 6</p>
       </a>
       <a class="card feature" href="#/media">
         <span class="icon">◈</span>
@@ -91,7 +94,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
       </a>
     </section>
     <section class="${team ? "grid-3" : "grid-2"}" style="margin-top:1rem">
-      <article class="card stat"><b>${roster.players.length}</b>rostered Wizards</article>
+      <article class="card stat"><b>${roster.players.filter(isActive).length}</b>rostered Wizards</article>
       <article class="card stat"><b>6</b>needed for league night</article>
       ${duesStat}
     </section>
@@ -435,7 +438,7 @@ function wizLeagueRankTag(teams) {
 
 function recruitNeedTag(roster) {
   const players = (roster && roster.players) || [];
-  const n = typeof onSquad === "function" ? players.filter((p) => onSquad(p, "league")).length : players.length;
+  const n = players.filter((p) => isActive(p) && (typeof onSquad !== "function" || onSquad(p, "league"))).length;
   return n < 12 ? "Looking for more players" : "";
 }
 

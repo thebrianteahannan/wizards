@@ -6,7 +6,6 @@ function playerSquads(p) {
 function onSquad(p, squad) {
   return playerSquads(p).includes(squad);
 }
-
 function nextProposed(avail) {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = [...(avail.offers || [])]
@@ -31,15 +30,17 @@ function playerMark(avail, playerId, offer, kind) {
   return entry.status === "yes" || entry.status === "maybe" ? entry.status : "";
 }
 
-function rosterRows(players, squad) {
+function rosterRows(players, squad, dead) {
   return players
     .map((p, i) => {
       const pos = (p.positions || []).join(", ") || "Util";
-      const inBook = onSquad(p, squad);
-      const tag = isAdmin()
+      const inBook = dead || squad === "tournament" || onSquad(p, squad);
+      const tag = !dead && isAdmin()
         ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit;white-space:nowrap">${escapeHtml(pos)}</button>`
         : `<span class="tag" style="white-space:nowrap">${escapeHtml(pos)}</span>`;
-      const last = isAdmin()
+      const last = dead
+        ? `<span class="muted">Inactive</span>`
+        : isAdmin()
         ? `<span>${["league", "tournament"]
             .map((book) => {
               const on = onSquad(p, book);
@@ -48,7 +49,7 @@ function rosterRows(players, squad) {
             .join("")}</span>`
         : `<span class="muted">${inBook ? (p.born ? escapeHtml(p.born) : "") : squad === "league" ? "Not league" : "Not tourney"}</span>`;
       return `
-        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem 5.2rem;${inBook ? "" : "opacity:0.55"}">
+        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem 5.2rem;${inBook && !dead ? "" : "opacity:0.55"}">
           <span class="num">${i + 1}</span>
           <strong>${escapeHtml(p.name)}</strong>
           <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
@@ -168,7 +169,6 @@ function bindPosEditor(root, roster, onSaved) {
 function pitcherKey(squad) {
   return "wizardsPitcher-" + (squad === "tournament" ? "tournament" : "league");
 }
-
 function pitcherArms(players) {
   return players.filter((p) => (p.positions || []).includes("P") || p.id === "jose-gonzalez" || p.id === "cam");
 }
@@ -301,6 +301,7 @@ function nightMarks(roster, avail, day, liveStatus) {
   const myId = sessionPlayerId(roster.players);
   const marks = {};
   const players = roster.players.filter((p) => {
+    if (!isActive(p)) return false;
     let st = ((((avail.players || {})[p.id] || {}).days || {})[day] || {}).status;
     if (p.id === myId && liveStatus) st = liveStatus;
     if (st !== "yes" && st !== "maybe") return false;
@@ -404,8 +405,10 @@ function paintAvailDiamond(card, roster, avail, kind, offer, toggle) {
 
 function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, heading) {
   squad = squad === "tournament" ? "tournament" : "league";
-  const field = roster.players.filter((p) => onSquad(p, squad));
+  const active = roster.players.filter(isActive);
   const leagueOn = squad === "league";
+  const field = leagueOn ? active.filter((p) => onSquad(p, "league")) : active;
+  const inactive = roster.players.filter((p) => !isActive(p) && onSquad(p, "league"));
   const avail = leagueOn ? leagueAvail || {} : tourneyAvail || {};
   const offer = nextProposed(avail);
   const marks = {};
@@ -432,12 +435,12 @@ function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, head
       <p class="muted">${blurb}</p>
       <div class="roster-layout">
         ${rosterDiamond(field, svgId || "dg-roster", marks, offer, pitcherId)}
-        <div class="roster-list">${rosterRows(roster.players, squad)}</div>
+        <div class="roster-list">${rosterRows(field, squad)}</div>
       </div>
+      ${leagueOn && inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Inactive</p>${rosterRows(inactive, squad, true)}</div>` : ""}
     </div>
   `;
 }
-
 function renderRoster(roster, squad, leagueAvail, tourneyAvail) {
   return `
     <p class="lede">One Wizards book. League and Tournament only change which dates light up on the diamond. Co-managers: Tony Kurtanick and Brian Hannan.</p>

@@ -1,6 +1,7 @@
 function lineupFromIds(roster, ids) {
   const byId = {};
-  for (const p of roster.players) byId[p.id] = p;
+  const pool = roster.players.filter(isActive);
+  for (const p of pool) byId[p.id] = p;
   const seen = new Set();
   const list = [];
   for (const id of ids || []) {
@@ -9,7 +10,7 @@ function lineupFromIds(roster, ids) {
       list.push(byId[id]);
     }
   }
-  for (const p of roster.players) {
+  for (const p of pool) {
     if (!seen.has(p.id)) list.push(p);
   }
   return list;
@@ -43,7 +44,7 @@ function takeBest(pool, score) {
 }
 
 function classicBattingOrder(roster, stats) {
-  const pool = roster.players.slice();
+  const pool = roster.players.filter(isActive);
   const d = (p) => batterDims(stats, p);
   const cleanup = takeBest(pool, (p) => d(p).power);
   const three = takeBest(pool, (p) => d(p).all);
@@ -55,7 +56,7 @@ function classicBattingOrder(roster, stats) {
 }
 
 function ratingOrder(roster, stats) {
-  return roster.players.slice().sort((a, b) => {
+  return roster.players.filter(isActive).sort((a, b) => {
     const ra = hitterRating(batterRow(stats, a));
     const rb = hitterRating(batterRow(stats, b));
     if (ra == null && rb == null) return a.name.localeCompare(b.name);
@@ -124,8 +125,6 @@ function batterLine(hit) {
   return BAT_LINE.map(([key, label]) => `${label} ${escapeHtml(hit[key] == null || hit[key] === "" ? "—" : String(hit[key]))}`).join(" · ");
 }
 
-const HOLE = ["Lead", "2", "3", "Cleanup", "5"];
-
 function renderOffense(roster, stats, customIds, mode) {
   const lineup = mode === "lineup";
   const admin = lineup && isAdmin();
@@ -138,9 +137,8 @@ function renderOffense(roster, stats, customIds, mode) {
         ? `<span><button type="button" class="btn ghost" data-bat-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-bat-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
       const grade = score == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(score)}">${score}${/tourney/i.test(String((hit && hit.source) || "")) ? "*" : ""}</b>`;
-      const hole = lineup && HOLE[i] ? `<small class="muted" style="display:block;font-size:0.62rem">${HOLE[i]}</small>` : "";
       return `<div class="roster-row" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:center">
-        <span class="num">${i + 1}${hole}</span>
+        <span class="num">${i + 1}</span>
         <span class="num" title="Hit rating">${grade}</span>
         <strong>${escapeHtml(p.name)}</strong>
         <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${batterLine(hit)}</div>
@@ -246,7 +244,6 @@ function applyNightOrder(starters, customIds, stats) {
 
 function nightPlayerRow(p, marks, hole, bat, pit, batStar, pitStar, onBench) {
   const pos = (p.positions || []).join(", ") || "Util";
-  const holeHtml = hole ? `<small class="muted" style="display:block;font-size:0.62rem">${escapeHtml(hole)}</small>` : "";
   const edit = typeof canEditPos === "function" && canEditPos();
   const btn = 'class="btn ghost" style="padding:0.08rem 0.32rem;font-size:0.62rem"';
   const arrows = edit && !onBench
@@ -255,15 +252,15 @@ function nightPlayerRow(p, marks, hole, bat, pit, batStar, pitStar, onBench) {
   const move = edit
     ? `<button type="button" ${btn} data-${onBench ? "unsit" : "sit"}="${escapeHtml(p.id)}">${onBench ? "Start" : "Bench"}</button>`
     : "";
-  return `<div class="roster-row"${onBench ? "" : ` data-night-bat="${escapeHtml(p.id)}"`} style="grid-template-columns:3.6rem 2.2rem 2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem${edit ? " 3.4rem 3.2rem" : ""}">
-    <span class="num">${holeHtml}</span>
-    <span class="num">${nightGrade(bat, "Hit rating", batStar)}</span>
-    <span class="num">${nightGrade(pit, "Pitch rating", pitStar)}</span>
+  return `<div class="roster-row"${onBench ? "" : ` data-night-bat="${escapeHtml(p.id)}"`} style="grid-template-columns:2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem 2.2rem 2.2rem${edit ? " 3.4rem 3.2rem" : ""}">
+    <span class="num">${onBench ? "" : escapeHtml(hole)}</span>
     <strong style="white-space:normal;overflow:visible">${escapeHtml(p.name)}${marks[p.id] === "maybe" ? ' <span class="muted">maybe</span>' : ""}</strong>
     <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
     ${edit
       ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit;white-space:nowrap">${escapeHtml(pos)}</button>`
       : `<span class="tag">${escapeHtml(pos)}</span>`}
+    <span class="num">${nightGrade(bat, "Hit rating", batStar)}</span>
+    <span class="num">${nightGrade(pit, "Pitch rating", pitStar)}</span>
     ${arrows}${move}
   </div>`;
 }
@@ -289,9 +286,8 @@ async function paintNightLineup(players, marks, sit, onSit, customIds) {
     const startIds = new Set(starters.map((p) => p.id));
     const bench = ranked.filter((p) => !startIds.has(p.id));
     const ordered = applyNightOrder(starters, customIds, stats);
-    const holes = ["Lead", "2", "3", "Cleanup", "5", "6"];
     const edit = typeof canEditPos === "function" && canEditPos();
-    const cols = "3.6rem 2.2rem 2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem" + (edit ? " 3.4rem 3.2rem" : "");
+    const cols = "2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem 2.2rem 2.2rem" + (edit ? " 3.4rem 3.2rem" : "");
     const rowOf = (p, hole, onBench) => {
       const hit = batterRow(stats, p);
       const arm = typeof pitcherRow === "function" ? pitcherRow(stats, p) : null;
@@ -302,8 +298,8 @@ async function paintNightLineup(players, marks, sit, onSit, customIds) {
     if (edit) {
       html += `<p class="muted" style="margin:0 0 0.35rem">↑ ↓ overrides auto order for this date.${customIds && customIds.length ? ' <button type="button" class="btn ghost" data-night-auto style="padding:0.08rem 0.4rem;font-size:0.62rem">Auto</button>' : ""}</p>`;
     }
-    html += `<div class="roster-row" style="grid-template-columns:${cols}"><span></span><span class="num muted" style="font-size:0.62rem">BAT</span><span class="num muted" style="font-size:0.62rem">PIT</span><span></span><span></span><span></span>${edit ? "<span></span><span></span>" : ""}</div>`;
-    html += ordered.map((p, i) => rowOf(p, holes[i] || String(i + 1), false)).join("");
+    html += `<div class="roster-row" style="grid-template-columns:${cols}"><span></span><span></span><span></span><span></span><span class="num muted" style="font-size:0.62rem">BAT</span><span class="num muted" style="font-size:0.62rem">PIT</span>${edit ? "<span></span><span></span>" : ""}</div>`;
+    html += ordered.map((p, i) => rowOf(p, String(i + 1), false)).join("");
     if (bench.length) {
       html += `<div style="border-top:1px solid var(--line);margin:0.55rem 0 0.4rem"></div><p class="kicker" style="margin:0 0 0.3rem">Bench</p>`;
       html += bench.map((p) => rowOf(p, "", true)).join("");
