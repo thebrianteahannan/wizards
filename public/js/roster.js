@@ -21,7 +21,8 @@ function nextProposed(avail) {
 }
 
 function offerKey(offer, kind) {
-  return kind === "tournament" ? offer.date || offer.day : offer.day;
+  if (offer && offer.date) return offer.date;
+  return (offer && offer.day) || "";
 }
 
 function playerMark(avail, playerId, offer, kind) {
@@ -31,27 +32,60 @@ function playerMark(avail, playerId, offer, kind) {
 }
 
 function rosterRows(players, squad, dead) {
+  const admin = isAdmin();
+  const lastCol = admin ? (dead ? "11.5rem" : "9.5rem") : "5.2rem";
+  const offStatuses = [
+    { status: "IR", label: "IR" },
+    { status: "New", label: "New" },
+    { status: "Inactive", label: "Away" },
+  ];
   return players
     .map((p, i) => {
       const pos = (p.positions || []).join(", ") || "Util";
       const inBook = dead || squad === "tournament" || onSquad(p, squad);
-      const tag = !dead && isAdmin()
+      const cur = typeof rosterStatus === "function" ? rosterStatus(p) : p.status || "Active";
+      const limits = String(p.limits || "").trim();
+      const tag = !dead && admin
         ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit;white-space:nowrap">${escapeHtml(pos)}</button>`
         : `<span class="tag" style="white-space:nowrap">${escapeHtml(pos)}</span>`;
-      const last = dead
-        ? `<span class="muted">Inactive</span>`
-        : isAdmin()
-        ? `<span>${["league", "tournament"]
-            .map((book) => {
-              const on = onSquad(p, book);
-              return `<button type="button" class="btn ghost" data-squad-set="${escapeHtml(p.id)}" data-book="${book}" style="padding:0.08rem 0.32rem;font-size:0.62rem;margin-left:0.15rem${on ? "" : ";opacity:0.4"}">${book === "league" ? "L" : "T"}</button>`;
+      let last;
+      if (dead && admin) {
+        last = `<span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:0.12rem">
+          ${offStatuses
+            .map((s) => {
+              const on = cur === s.status;
+              return `<button type="button" class="btn ${on ? "" : "ghost"}" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}" style="padding:0.08rem 0.28rem;font-size:0.62rem">${s.label}</button>`;
             })
-            .join("")}</span>`
-        : `<span class="muted">${inBook ? (p.born ? escapeHtml(p.born) : "") : squad === "league" ? "Not league" : "Not tourney"}</span>`;
+            .join("")}
+          <button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="Active" style="padding:0.08rem 0.28rem;font-size:0.62rem">On</button>
+          <button type="button" class="btn ghost" data-roster-del="${escapeHtml(p.id)}" style="padding:0.08rem 0.28rem;font-size:0.62rem" title="Delete player">Del</button>
+        </span>`;
+      } else if (dead) {
+        const label = typeof rosterStatusLabel === "function" ? rosterStatusLabel(cur) : cur;
+        last = `<span class="muted">${escapeHtml(label)}</span>`;
+      } else if (admin) {
+        last = `<span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:0.12rem">${["league", "tournament"]
+          .map((book) => {
+            const on = onSquad(p, book);
+            return `<button type="button" class="btn ghost" data-squad-set="${escapeHtml(p.id)}" data-book="${book}" style="padding:0.08rem 0.28rem;font-size:0.62rem${on ? "" : ";opacity:0.4"}">${book === "league" ? "L" : "T"}</button>`;
+          })
+          .join("")}${offStatuses
+          .map((s) => `<button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}" style="padding:0.08rem 0.28rem;font-size:0.62rem">${s.label}</button>`)
+          .join("")}</span>`;
+      } else {
+        last = `<span class="muted">${inBook ? (p.born ? escapeHtml(p.born) : "") : squad === "league" ? "Not league" : "Not tourney"}</span>`;
+      }
+      const when = !dead
+        ? admin
+          ? `<button type="button" class="muted" data-edit-limits="${escapeHtml(p.id)}" style="display:block;width:100%;text-align:left;background:none;border:0;padding:0;margin:0.12rem 0 0;font:inherit;font-size:0.68rem;line-height:1.25;cursor:pointer;white-space:normal">${limits ? escapeHtml(limits) : "Availability…"}</button>`
+          : limits
+          ? `<span class="muted" style="display:block;margin-top:0.12rem;font-size:0.68rem;line-height:1.25;white-space:normal">${escapeHtml(limits)}</span>`
+          : ""
+        : "";
       return `
-        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem 5.2rem;${inBook && !dead ? "" : "opacity:0.55"}">
+        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem ${lastCol};${inBook && !dead ? "" : "opacity:0.55"}">
           <span class="num">${i + 1}</span>
-          <strong>${escapeHtml(p.name)}</strong>
+          <span style="min-width:0"><strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.name)}</strong>${when}</span>
           <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
           ${tag}
           ${last}
@@ -141,7 +175,7 @@ function bindPosEditor(root, roster, onSaved) {
       const list = root.querySelector(".roster-list") || root;
       const row = btn.closest(".roster-row");
       const open = list.querySelector(`.pos-inline[data-id="${id}"]`);
-      list.querySelectorAll(".pos-inline").forEach((el) => el.remove());
+      list.querySelectorAll(".pos-inline, .limits-inline").forEach((el) => el.remove());
       if (open) return;
       const p = roster.players.find((x) => x.id === id);
       if (!p) return;
@@ -156,6 +190,58 @@ function bindPosEditor(root, roster, onSaved) {
         const note = form.querySelector(".pos-msg");
         try {
           const next = await api.send("/api/roster/" + id + "/positions", "PUT", { positions: readPosPicker(form) });
+          roster.players = next.players || roster.players;
+          onSaved();
+        } catch (err) {
+          if (note) note.textContent = err.message;
+        }
+      });
+    });
+  });
+}
+
+function limitsEditorHtml(p) {
+  return `<form class="limits-inline card" data-id="${escapeHtml(p.id)}" style="padding:0.55rem 0.7rem">
+    <label class="muted" style="display:block;font-size:0.72rem;margin-bottom:0.25rem">Availability limits</label>
+    <textarea name="limits" rows="2" maxlength="200" placeholder="e.g. Fridays only · through Sept · every other weekend" style="width:100%;box-sizing:border-box">${escapeHtml(p.limits || "")}</textarea>
+    <div class="actions" style="margin-top:0.4rem">
+      <button class="btn" type="submit">Save</button>
+      <button class="btn ghost" type="button" data-limits-cancel>Cancel</button>
+      <p class="muted limits-msg" style="margin:0"></p>
+    </div>
+  </form>`;
+}
+
+function bindLimitsEditor(root, roster, onSaved) {
+  if (!root || !canEditPos()) return;
+  root.querySelectorAll("[data-edit-limits]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.editLimits;
+      const list = root.querySelector(".roster-list") || root;
+      const row = btn.closest(".roster-row");
+      const open = list.querySelector(`.limits-inline[data-id="${id}"]`);
+      list.querySelectorAll(".pos-inline, .limits-inline").forEach((el) => el.remove());
+      if (open) return;
+      const p = roster.players.find((x) => x.id === id);
+      if (!p) return;
+      if (row) row.insertAdjacentHTML("afterend", limitsEditorHtml(p));
+      else list.insertAdjacentHTML("beforeend", limitsEditorHtml(p));
+      const form = list.querySelector(`.limits-inline[data-id="${id}"]`);
+      if (!form) return;
+      const area = form.querySelector("textarea[name=limits]");
+      if (area) {
+        area.focus();
+        area.setSelectionRange(area.value.length, area.value.length);
+      }
+      form.querySelector("[data-limits-cancel]").addEventListener("click", () => form.remove());
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const note = form.querySelector(".limits-msg");
+        try {
+          const next = await api.send("/api/roster/" + id + "/limits", "PUT", {
+            limits: String((area && area.value) || "").trim(),
+          });
           roster.players = next.players || roster.players;
           onSaved();
         } catch (err) {
@@ -408,7 +494,7 @@ function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, head
   const active = roster.players.filter(isActive);
   const leagueOn = squad === "league";
   const field = leagueOn ? active.filter((p) => onSquad(p, "league")) : active;
-  const inactive = roster.players.filter((p) => !isActive(p) && onSquad(p, "league"));
+  const inactive = roster.players.filter((p) => !isActive(p));
   const avail = leagueOn ? leagueAvail || {} : tourneyAvail || {};
   const offer = nextProposed(avail);
   const marks = {};
@@ -437,7 +523,7 @@ function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, head
         ${rosterDiamond(field, svgId || "dg-roster", marks, offer, pitcherId)}
         <div class="roster-list">${rosterRows(field, squad)}</div>
       </div>
-      ${leagueOn && inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Inactive</p>${rosterRows(inactive, squad, true)}</div>` : ""}
+      ${leagueOn && inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Sideline · IR / New / Away</p>${rosterRows(inactive, squad, true)}</div>` : ""}
     </div>
   `;
 }
@@ -491,7 +577,40 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
       }
     });
   });
+  document.querySelectorAll("[data-status-set]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const p = roster.players.find((x) => x.id === btn.dataset.statusSet);
+      if (!p) return;
+      try {
+        const saved = await api.send("/api/roster/" + p.id + "/status", "PUT", { status: btn.dataset.status });
+        Object.assign(roster, saved);
+        const box = document.getElementById("roster-embed");
+        redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+  document.querySelectorAll("[data-roster-del]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const p = roster.players.find((x) => x.id === btn.dataset.rosterDel);
+      if (!p) return;
+      if (!confirm("Delete " + p.name + " from the roster permanently?")) return;
+      try {
+        const saved = await api.send("/api/roster/" + p.id, "DELETE");
+        Object.assign(roster, saved);
+        const box = document.getElementById("roster-embed");
+        redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
   bindPosEditor(document.getElementById("roster-embed"), roster, () => {
+    const box = document.getElementById("roster-embed");
+    redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
+  });
+  bindLimitsEditor(document.getElementById("roster-embed"), roster, () => {
     const box = document.getElementById("roster-embed");
     redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
   });

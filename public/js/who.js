@@ -8,7 +8,20 @@ function writeWhoCookie(id) {
 }
 
 function isActive(p) {
-  return String((p && p.status) || "Active").toLowerCase() !== "inactive";
+  return String((p && p.status) || "Active").toLowerCase() === "active";
+}
+
+function rosterStatus(p) {
+  const s = String((p && p.status) || "Active");
+  if (s === "IR" || s === "New" || s === "Inactive" || s === "Active") return s;
+  return s.toLowerCase() === "active" ? "Active" : "Inactive";
+}
+
+function rosterStatusLabel(status) {
+  if (status === "IR") return "IR";
+  if (status === "New") return "New";
+  if (status === "Inactive") return "Away";
+  return "Active";
 }
 
 function sessionPlayerId(players) {

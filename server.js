@@ -6,6 +6,7 @@ const { attachRecruitActions } = require("./recruit-actions");
 const { getPlwStats } = require("./plw-stats");
 const { attachPlwLeague } = require("./plw-league");
 const { attachNightSit } = require("./night-sit");
+const { syncLeagueOffers } = require("./plw-calendar");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -120,7 +121,19 @@ async function logAvailability(player, kind, prevDays, nextDays, keys) {
 }
 
 app.get("/api/availability", async (req, res) => {
-  res.json(await readJson(AVAIL_FILES[availKind(req)]));
+  const kind = availKind(req);
+  let avail = await readJson(AVAIL_FILES[kind]);
+  if (kind === "league") {
+    try {
+      const before = JSON.stringify(avail.offers || []);
+      const synced = await syncLeagueOffers(avail, { refresh: req.query.refresh === "1" });
+      avail = synced.avail;
+      if (!synced.error && JSON.stringify(avail.offers || []) !== before) {
+        await writeJson("availability.json", avail);
+      }
+    } catch (_) {}
+  }
+  res.json(avail);
 });
 
 function clockLabel(t) {
@@ -362,6 +375,79 @@ app.put("/api/roster/:id/positions", requireAdmin, async (req, res) => {
   const seen = new Set();
   player.positions = raw.filter((p) => JOIN_POS.includes(p) && !seen.has(p) && seen.add(p));
   await writeJson("roster.json", roster);
+  res.json(roster);
+});
+
+app.put("/api/roster/:id/limits", requireAdmin, async (req, res) => {
+  const { roster, map } = await rosterById();
+  const player = map[req.params.id];
+  if (!player) return res.status(404).json({ error: "Unknown player" });
+  const limits = String((req.body && req.body.limits) || "").trim().slice(0, 200);
+  if (limits) player.limits = limits;
+  else delete player.limits;
+  await writeJson("roster.json", roster);
+  res.json(roster);
+});
+
+const ROSTER_STATUSES = ["Active", "Inactive", "IR", "New"];
+
+app.put("/api/roster/:id/status", requireAdmin, async (req, res) => {
+  const { roster, map } = await rosterById();
+  const player = map[req.params.id];
+  if (!player) return res.status(404).json({ error: "Unknown player" });
+  const status = String((req.body && req.body.status) || "").trim();
+  if (!ROSTER_STATUSES.includes(status)) {
+    return res.status(400).json({ error: "Status must be Active, Inactive, IR, or New" });
+  }
+  player.status = status;
+  player.regular = status === "Active";
+  if (status !== "Active") {
+    const drop = (arr) => (Array.isArray(arr) ? arr.filter((id) => id !== player.id) : arr);
+    roster.battingOrder = drop(roster.battingOrder);
+    roster.pitchingOrder = drop(roster.pitchingOrder);
+  }
+  await writeJson("roster.json", roster);
+  res.json(roster);
+});
+
+app.delete("/api/roster/:id", requireAdmin, async (req, res) => {
+  const roster = await readJson("roster.json");
+  const id = req.params.id;
+  const i = roster.players.findIndex((p) => p.id === id);
+  if (i < 0) return res.status(404).json({ error: "Unknown player" });
+  roster.players.splice(i, 1);
+  const drop = (arr) => (Array.isArray(arr) ? arr.filter((x) => x !== id) : arr);
+  roster.battingOrder = drop(roster.battingOrder);
+  roster.pitchingOrder = drop(roster.pitchingOrder);
+  await writeJson("roster.json", roster);
+
+  try {
+    const contacts = await readJson("contacts.json");
+    if (contacts.phones && contacts.phones[id] != null) delete contacts.phones[id];
+    if (contacts.emails && contacts.emails[id] != null) delete contacts.emails[id];
+    await writeJson("contacts.json", contacts);
+  } catch (_) {}
+
+  try {
+    const avail = await readJson("availability.json");
+    if (avail.players && avail.players[id]) {
+      delete avail.players[id];
+      await writeJson("availability.json", avail);
+    }
+  } catch (_) {}
+
+  try {
+    const accounts = await readJson("accounts.json");
+    let changed = false;
+    for (const u of accounts.users || []) {
+      if (u.playerId === id) {
+        u.playerId = "";
+        changed = true;
+      }
+    }
+    if (changed) await writeJson("accounts.json", accounts);
+  } catch (_) {}
+
   res.json(roster);
 });
 

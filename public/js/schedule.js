@@ -3,9 +3,9 @@ function eventHeadcount(e, packs) {
   const avail = (packs && packs[kind]) || {};
   const offer = (avail.offers || []).find((o) => o.date === e.date);
   let key;
-  if (offer) key = kind === "league" ? offer.day : offer.date || offer.day;
+  if (offer) key = offer.date || offer.day;
   else if (kind === "league") {
-    key = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][new Date(e.date + "T12:00:00").getDay()];
+    key = e.date;
   } else key = e.date;
   let yes = 0;
   let maybe = 0;

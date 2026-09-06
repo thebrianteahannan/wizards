@@ -39,13 +39,13 @@
       "id": "jose-gonzalez",
       "name": "Jose Gonzalez",
       "number": 2,
-      "positions": ["2B", "SS"],
+      "positions": ["P", "2B", "SS"],
       "born": "3/4/1972",
       "sex": "M",
-      "status": "Active",
+      "status": "IR",
       "role": "Player",
-      "regular": true,
-      "squads": ["league", "tournament"]
+      "regular": false,
+      "squads": ["league"]
     },
     {
       "id": "jr-cadotte",
@@ -64,18 +64,6 @@
       "name": "Angel Rodriquez",
       "number": null,
       "positions": ["2B", "CF"],
-      "born": null,
-      "sex": "M",
-      "status": "Active",
-      "role": "Player",
-      "regular": true,
-      "squads": ["league"]
-    },
-    {
-      "id": "jostheir-aponte",
-      "name": "Jostheir Aponte",
-      "number": 0,
-      "positions": ["Util"],
       "born": null,
       "sex": "M",
       "status": "Active",
@@ -130,6 +118,66 @@
       "role": "Player",
       "regular": true,
       "squads": ["tournament"]
+    },
+    {
+      "id": "kevin-mccracken",
+      "name": "Kevin McCracken",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league"]
+    },
+    {
+      "id": "johnny-driscoll",
+      "name": "Johnny Driscoll",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "Active",
+      "role": "Player",
+      "regular": true,
+      "squads": ["league"]
+    },
+    {
+      "id": "jostheir-aponte",
+      "name": "Jostheir Aponte",
+      "number": 0,
+      "positions": ["Util"],
+      "born": null,
+      "sex": "M",
+      "status": "Inactive",
+      "role": "Player",
+      "regular": false,
+      "squads": ["league"]
+    },
+    {
+      "id": "steven-guiffre",
+      "name": "Steven Guiffre",
+      "number": 32,
+      "positions": ["IF", "2B"],
+      "born": null,
+      "sex": "M",
+      "status": "Inactive",
+      "role": "Player",
+      "regular": false,
+      "squads": ["league"]
+    },
+    {
+      "id": "mike-zaniewski",
+      "name": "Mike Zaniewski",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "Inactive",
+      "role": "Player",
+      "regular": false,
+      "squads": ["league"]
     }
   ]
 }

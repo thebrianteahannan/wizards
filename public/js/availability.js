@@ -2,9 +2,9 @@ const AVAIL_META = {
   league: {
     kind: "league",
     title: "League",
-    lede: "Mark the windows Adam sent. Green at NEED yes.",
-    from: "From Adam",
-    board: "Windows on the board",
+    lede: "Open nights and Wizards games from the MyStatsOnline calendar. Green at NEED yes.",
+    from: "From MyStatsOnline",
+    board: "Nights on the board",
   },
   tournament: {
     kind: "tournament",
@@ -31,7 +31,8 @@ function availApi(kind) {
 }
 
 function offerKey(offer, kind) {
-  return kind === "league" ? offer.day : offer.date || offer.day;
+  if (offer && offer.date) return offer.date;
+  return (offer && offer.day) || "";
 }
 
 function slugTime(label) {
@@ -105,7 +106,13 @@ async function renderAvailability(roster, avail, playerId, kind) {
   const isManager = isAdmin() || (roster.players.find((p) => p.id === savedId) || {}).role === "Co-manager";
   const needed = avail.needed || 6;
 
-  const offers = [...(avail.offers || [])].sort((a, b) => String(a.date || a.day).localeCompare(String(b.date || b.day)));
+  const today = (() => {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  })();
+  const offers = [...(avail.offers || [])]
+    .filter((o) => page.kind !== "league" || !o.date || o.date >= today)
+    .sort((a, b) => String(a.date || a.day).localeCompare(String(b.date || b.day)));
   let book = [];
   if (page.kind === "league") {
     try {
@@ -163,11 +170,16 @@ async function renderAvailability(roster, avail, playerId, kind) {
   };
   const dayCols = offers.map(dayCard).join("");
 
+  const limitNotes = (roster.players || [])
+    .filter((p) => isActive(p) && String(p.limits || "").trim())
+    .map((p) => `<li><strong>${escapeHtml(p.name)}</strong> — ${escapeHtml(String(p.limits).trim())}</li>`)
+    .join("");
   return `
     <p class="kicker">Need ${needed} at the same time</p>
     <h1>${escapeHtml(page.title)}</h1>
     <p class="lede">${escapeHtml(page.lede.replace("NEED", String(needed)))}</p>
     ${availTabs(page.kind)}
+    ${limitNotes ? `<section class="card" style="padding:0.7rem 0.85rem;margin-bottom:0.85rem"><p class="kicker" style="margin:0 0 0.35rem">Availability limits</p><ul style="margin:0;padding-left:1.1rem">${limitNotes}</ul></section>` : ""}
     ${page.kind === "practice" ? `
     <section class="card">
       <h2>New session</h2>

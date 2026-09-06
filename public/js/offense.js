@@ -282,10 +282,11 @@ async function paintNightLineup(players, marks, sit, onSit, customIds) {
       if (rb == null) return -1;
       return rb - ra;
     });
-    const starters = ranked.filter((p) => !parked.has(p.id)).slice(0, 6);
-    const startIds = new Set(starters.map((p) => p.id));
+    const pool = ranked.filter((p) => !parked.has(p.id));
+    const ordered = applyNightOrder(pool, customIds, stats);
+    const lineup = customIds && customIds.length ? ordered : ordered.slice(0, 6);
+    const startIds = new Set(lineup.map((p) => p.id));
     const bench = ranked.filter((p) => !startIds.has(p.id));
-    const ordered = applyNightOrder(starters, customIds, stats);
     const edit = typeof canEditPos === "function" && canEditPos();
     const cols = "2.2rem minmax(7rem,1.6fr) 2.4rem 4.2rem 2.2rem 2.2rem" + (edit ? " 3.4rem 3.2rem" : "");
     const rowOf = (p, hole, onBench) => {
@@ -299,7 +300,7 @@ async function paintNightLineup(players, marks, sit, onSit, customIds) {
       html += `<p class="muted" style="margin:0 0 0.35rem">↑ ↓ overrides auto order for this date.${customIds && customIds.length ? ' <button type="button" class="btn ghost" data-night-auto style="padding:0.08rem 0.4rem;font-size:0.62rem">Auto</button>' : ""}</p>`;
     }
     html += `<div class="roster-row" style="grid-template-columns:${cols}"><span></span><span></span><span></span><span></span><span class="num muted" style="font-size:0.62rem">BAT</span><span class="num muted" style="font-size:0.62rem">PIT</span>${edit ? "<span></span><span></span>" : ""}</div>`;
-    html += ordered.map((p, i) => rowOf(p, String(i + 1), false)).join("");
+    html += lineup.map((p, i) => rowOf(p, String(i + 1), false)).join("");
     if (bench.length) {
       html += `<div style="border-top:1px solid var(--line);margin:0.55rem 0 0.4rem"></div><p class="kicker" style="margin:0 0 0.3rem">Bench</p>`;
       html += bench.map((p) => rowOf(p, "", true)).join("");
