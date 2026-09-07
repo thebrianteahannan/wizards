@@ -45,8 +45,7 @@
         "Work the bottom of the 24×28.5 K-zone. Low misses are balls you survive.",
         "Walk one: get timid, throw strikes. Walk two: you are done.",
         "Do not show every pitch in game 1 of a season or a series.",
-        "On contact: pick it and throw in the air now. Five seconds is plenty if you start immediately.",
-        "Double play: middle panel of the backstop. Tag 2nd/3rd if that is the force.",
+        "Fielding is a 5-second throw, not baseball. Knock it down, in the air, to the wall. See Fielding below.",
         "An ace who cannot give you nine innings on a night leaves game 3 exposed."
       ]
     },
@@ -84,6 +83,18 @@
         "Change of speed can fool them even when location does not. Changeups exist to get a loud swing out in front.",
         "Never lay a cookie 3–2 with traffic. Walk and go to the next arm rather than a three-run hanger.",
         "After they just missed one out front, do not come back middle at the speed they sat on. Jam, bury it, or change eye level."
+      ]
+    },
+    {
+      "title": "Fielding",
+      "items": [
+        "Nobody runs to first. The clock is the runner. Starts when the ball is in the hitting area. Stops at the backstop / K-zone / a force bag. 4.99 is an out. 5.00 is safe.",
+        "You do not have to field it clean. Knock it down and throw immediately, in the air. A short hop in front of the wall is an error.",
+        "The backstop is first. On a normal grounder you have the whole wall, or the K-zone, or the batter if you hit him in the air. Do not run to first. Stay out of the throwing lane.",
+        "Double play: tag second (or third if that is the force), then if you still have time hit the middle panel of the backstop — between the two pipes — or the K-zone. Regular first-base throws can use the whole wall; the DP throw cannot.",
+        "First and second / bases loaded: cheapest two outs are step on third, throw to second. First only if time. No third baseman means you cannot go that way — take the sure out.",
+        "Miss low, not over the top. Over the backstop is extra bases. Through the infield or an outfielder touching it is already a single — live with it.",
+        "Fly ball with nobody on third: catch it. Bare hands. High ones are harder than baseball. Tag from third is the only time anyone actually runs — cutoff is legal; get the ball to the backstop or K-zone in the air before he touches home. Do not airmail it over the wall."
       ]
     }
   ],
@@ -231,6 +242,48 @@
       "quote": "Plenty of time, knocked it down, still got all day. Five seconds is an eternity. You don't run to first. Five seconds is what you have. Hit the backstop in the air.",
       "who": "Sandvipers @ Vaderz, Opening Week",
       "href": "https://www.youtube.com/watch?v=BMcnYAOQpQY&t=4023s"
+    },
+    {
+      "tip": "Don't run to first",
+      "quote": "They don't run to first — there's just no sense. Five seconds is what you have. You don't want to get in the way of a thrown ball because if a runner gets hit and he's not past a certain point, it's an out.",
+      "who": "Sandvipers @ Vaderz, Opening Week",
+      "href": "https://www.youtube.com/watch?v=BMcnYAOQpQY&t=6202s"
+    },
+    {
+      "tip": "Throw must be in the air",
+      "quote": "Looks like that one hit the turf just before the backstop. You've got to make that throw in the air in under five seconds. That's going to put him on first with a reached on error.",
+      "who": "Booth · short hop is an error",
+      "href": "https://www.youtube.com/watch?v=oDpgt7al9Tg&t=327s"
+    },
+    {
+      "tip": "Don't have to field it clean",
+      "quote": "Get that ball — you don't have to field it cleanly, but you just got to get it to that backstop in under five seconds. One of the hallmark rules here in PLW.",
+      "who": "Booth · five-second rule",
+      "href": "https://www.youtube.com/watch?v=5Gn8X2q6cjU&t=885s"
+    },
+    {
+      "tip": "DP: middle panel only",
+      "quote": "Remember to turn that double play — it is the middle part of the backstop, inside those two pipes, or the strike zone. On a regular ground ball the infielders have that entire backstop to aim for. That backstop does play as first base.",
+      "who": "Gannon in the booth · Warbirds @ Snappers",
+      "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=6831s"
+    },
+    {
+      "tip": "Step third, throw second",
+      "quote": "Easy double play as you see him step on third, get the force, throw to second, get the force. You got five seconds upon contact.",
+      "who": "Booth · clock starts when the ball is imminent",
+      "href": "https://www.youtube.com/watch?v=O1x49J2zu1s&t=1125s"
+    },
+    {
+      "tip": "Miss low, not high",
+      "quote": "He misses the center panel low for the double play. Better to miss low than miss high — don't throw it away and put that runner in scoring position.",
+      "who": "Booth · backstop is first base",
+      "href": "https://www.youtube.com/watch?v=iwyoCkEKtyo&t=2564s"
+    },
+    {
+      "tip": "Tag from third: cutoff, then the wall",
+      "quote": "The one time that you actually run the bases here in PLW is tagging up from third to home. Only the runner on third can tag up. Fielders just have to get that ball to the backstop or strike zone before the runner touches home. You can use a cutoff guy — catch and a flip.",
+      "who": "Gannon in the booth · Warbirds @ Snappers",
+      "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=7362s"
     },
     {
       "tip": "Pitching staffs win titles",
