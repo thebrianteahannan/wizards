@@ -91,10 +91,12 @@
         "Nobody runs to first. The clock is the runner. Starts when the ball is in the hitting area. Stops at the backstop / K-zone / a force bag. 4.99 is an out. 5.00 is safe.",
         "You do not have to field it clean. Knock it down and throw immediately, in the air. A short hop in front of the wall is an error.",
         "The backstop is first. On a normal grounder you have the whole wall, or the K-zone, or the batter if you hit him in the air. Do not run to first. Stay out of the throwing lane.",
-        "Double play: tag second (or third if that is the force), then if you still have time hit the middle panel of the backstop — between the two pipes — or the K-zone. Regular first-base throws can use the whole wall; the DP throw cannot.",
-        "First and second / bases loaded: cheapest two outs are step on third, throw to second. First only if time. No third baseman means you cannot go that way — take the sure out.",
-        "Miss low, not over the top. Over the backstop is extra bases. Through the infield or an outfielder touching it is already a single — live with it.",
-        "Fly ball with nobody on third: catch it. Bare hands. High ones are harder than baseball. Tag from third is the only time anyone actually runs — cutoff is legal; get the ball to the backstop or K-zone in the air before he touches home. Do not airmail it over the wall."
+        "Feet: no intentional kicks. You cannot walk over and stick a foot out. The only legal feet are a slide in the outfield, or the pitcher deflecting a ball coming straight back to them. Kick it otherwise and it is dead.",
+        "Outfield single (did not hit the wall): under 5 seconds. Throw to third to hold the runner at second — that kills 1st-to-3rd. Throw to the backstop in the air to hold the runner at third — that kills a run from second. First and second: backstop holds both; a throw only to third holds the trail runner and the lead man still scores.",
+        "New triple rule: any ball that touches the wall — throw to third within 10 seconds to prevent a triple. Miss that window and it is a triple. Do not airmail it over the wall.",
+        "Go for the double play when there is a force and you have time. Runner on first: tag second, then the middle panel / K-zone. First and second or bases loaded: step on third, throw to second — that is the cheap two. Take it. One out and a DP ends the inning: go for two.",
+        "Do not go for two when there are already two outs (get one), when there is no force (only second or third occupied — unforced runners hold unless you attempt a DP), or with first and third (take the force at second or first; greed can let third go). Late, spinning, or no third baseman: sure out. Miss the DP throw low, not over the wall.",
+        "Fly ball, nobody on third: catch it. Bare hands. Tag from third is the only time anyone actually runs — cutoff is legal; get the ball to the backstop or K-zone before he touches home."
       ]
     }
   ],
@@ -284,6 +286,24 @@
       "quote": "The one time that you actually run the bases here in PLW is tagging up from third to home. Only the runner on third can tag up. Fielders just have to get that ball to the backstop or strike zone before the runner touches home. You can use a cutoff guy — catch and a flip.",
       "who": "Gannon in the booth · Warbirds @ Snappers",
       "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=7362s"
+    },
+    {
+      "tip": "OF: throw to third to hold at second",
+      "quote": "Heads up play — you can tell these guys practice that all the time. Throwing that to third to hold the runner at second base is huge, especially when you're already in a hole.",
+      "who": "Booth · hold runner at second",
+      "href": "https://www.youtube.com/watch?v=h83oF2yCt-k&t=1600s"
+    },
+    {
+      "tip": "Take the cheap 3rd-to-2nd DP",
+      "quote": "They're not gonna go to third then second though — that's a mistake, big mistake. The cheap double play in this league is available: you throw to third, you throw it to second, you get two force outs. It's awfully easy to execute most of the time. It's kind of a cheap way out of innings.",
+      "who": "The Ones @ Legends, Week 9",
+      "href": "https://www.youtube.com/watch?v=2boia-54dsk&t=10458s"
+    },
+    {
+      "tip": "No kicking unless you slide",
+      "quote": "Once you kick it it's a dead ball. The only time the ball can hit your feet is incidental contact, or if you're sliding out there in the outfield you can kind of slide-tackle the ball. Pretty much like the kickball rule — no intentional kicks unless you're engaged in a slide and you're an outfielder.",
+      "who": "Booth · feet on defense",
+      "href": "https://www.youtube.com/watch?v=dYdShva6S9o&t=9400s"
     },
     {
       "tip": "Pitching staffs win titles",
