@@ -6,7 +6,7 @@ const { attachRecruitActions } = require("./recruit-actions");
 const { getPlwStats } = require("./plw-stats");
 const { attachPlwLeague } = require("./plw-league");
 const { attachNightSit } = require("./night-sit");
-const { syncLeagueOffers } = require("./plw-calendar");
+const { syncLeagueOffers, syncScheduleEvents } = require("./plw-calendar");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,8 +46,16 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, ...status() });
 });
 
-app.get("/api/schedule", async (_req, res) => {
-  res.json(await readJson("schedule.json"));
+app.get("/api/schedule", async (req, res) => {
+  let schedule = await readJson("schedule.json");
+  try {
+    const next = await syncScheduleEvents(schedule, { refresh: req.query.refresh === "1" });
+    if (!next.error && next.changed) {
+      await writeJson("schedule.json", next.schedule);
+      schedule = next.schedule;
+    }
+  } catch (_) {}
+  res.json(schedule);
 });
 
 const AVAIL_FILES = {

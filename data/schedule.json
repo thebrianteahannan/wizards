@@ -87,6 +87,16 @@
       "detail": "Adam’s Friday window. Three games on the board."
     },
     {
+      "id": "plw-2026-09-08",
+      "date": "2026-09-08",
+      "title": "Dem Bois vs Wizards",
+      "when": "6:00 · 6:50 · 7:40 PM",
+      "kind": "league",
+      "status": "upcoming",
+      "detail": "Locked on the PLW MyStats calendar.",
+      "source": "mystats"
+    },
+    {
       "id": "sep-tourney",
       "date": "2026-09-26",
       "title": "PLW Tournament",

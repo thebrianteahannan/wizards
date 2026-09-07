@@ -141,12 +141,10 @@ function parseMonthNights(html) {
   return Object.values(byDate);
 }
 
-function offerFromNight(night) {
-  const games = night.games || [];
-  const times = [...new Set(games.map((g) => g.time))];
-  times.sort((a, b) => {
+function sortTimes(times) {
+  return [...new Set(times)].sort((a, b) => {
     const toMin = (t) => {
-      const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      const m = String(t).match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (!m) return 0;
       let h = Number(m[1]) % 12;
       if (/pm/i.test(m[3])) h += 12;
@@ -154,6 +152,19 @@ function offerFromNight(night) {
     };
     return toMin(a) - toMin(b);
   });
+}
+
+function formatTimes(times) {
+  const sorted = sortTimes(times);
+  const tags = sorted.map((t) => ((String(t).match(/AM|PM/i) || [""])[0] || "").toUpperCase());
+  const same = tags.length && tags.every((a) => a && a === tags[0]);
+  if (same) return sorted.map((t) => t.replace(/\s*(AM|PM)/i, "")).join(" · ") + " " + tags[0];
+  return sorted.join(" · ");
+}
+
+function offerFromNight(night) {
+  const games = night.games || [];
+  const times = sortTimes(games.map((g) => g.time));
   const wiz = games.find((g) => g.away === "WIZ" || g.home === "WIZ");
   let note;
   if (wiz) {
@@ -223,4 +234,71 @@ async function syncLeagueOffers(avail, opts) {
   return { avail, synced: nextOffers.length, error: "" };
 }
 
-module.exports = { syncLeagueOffers, loadCalendarNights, CAL_URL };
+function eventFromWizNight(night) {
+  const games = (night.games || []).filter((g) => g.away === "WIZ" || g.home === "WIZ");
+  if (!games.length) return null;
+  const wiz = games[0];
+  const them = wiz.away === "WIZ" ? wiz.home : wiz.away;
+  const title = wiz.home === "WIZ" ? teamName(them) + " vs Wizards" : "Wizards vs " + teamName(them);
+  const today = todayStamp();
+  return {
+    id: "plw-" + night.date,
+    date: night.date,
+    title,
+    when: formatTimes(games.map((g) => g.time)),
+    kind: "league",
+    status: night.date < today ? "played" : "upcoming",
+    detail: "Locked on the PLW MyStats calendar.",
+    source: "mystats",
+  };
+}
+
+function sameEvent(a, b) {
+  return a.title === b.title && a.when === b.when && a.status === b.status && a.detail === b.detail && a.source === b.source;
+}
+
+async function syncScheduleEvents(schedule, opts) {
+  let nights = [];
+  try {
+    nights = await loadCalendarNights(!!(opts && opts.refresh));
+  } catch (err) {
+    return { schedule, changed: false, error: String(err.message || err) };
+  }
+  const incoming = nights.map(eventFromWizNight).filter(Boolean);
+  const incomingIds = new Set(incoming.map((e) => e.id));
+  const today = todayStamp();
+  const kept = [];
+  let changed = false;
+  for (const e of schedule.events || []) {
+    if (e && e.source === "mystats" && e.date >= today && !incomingIds.has(e.id)) {
+      changed = true;
+      continue;
+    }
+    kept.push(e);
+  }
+  for (const ev of incoming) {
+    const i = kept.findIndex((e) => e && (e.id === ev.id || (e.source === "mystats" && e.date === ev.date)));
+    if (i >= 0) {
+      if (!sameEvent(kept[i], ev)) {
+        kept[i] = { ...kept[i], ...ev, id: kept[i].id || ev.id };
+        changed = true;
+      }
+      continue;
+    }
+    const j = kept.findIndex((e) => e && e.date === ev.date && e.kind === "league");
+    if (j >= 0) {
+      const merged = { ...kept[j], title: ev.title, when: ev.when, status: ev.status, detail: ev.detail, source: "mystats" };
+      if (!sameEvent(kept[j], merged)) {
+        kept[j] = merged;
+        changed = true;
+      }
+    } else {
+      kept.push(ev);
+      changed = true;
+    }
+  }
+  kept.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+  return { schedule: { ...schedule, events: kept }, changed, error: "" };
+}
+
+module.exports = { syncLeagueOffers, syncScheduleEvents, loadCalendarNights, CAL_URL };

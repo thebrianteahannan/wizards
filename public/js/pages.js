@@ -160,7 +160,7 @@ function renderSchedule(schedule, avail, view, monthKey, packs) {
       </div>
       <button class="btn ghost" type="button" id="sched-view">${view === "calendar" ? "List view" : "Calendar view"}</button>
     </div>
-    <p class="lede">${isTeam() ? `Tournaments and league dates. Recurring weeknight is chosen on <a href="#/availability">League</a> once six Wizards overlap.` : "Tournaments and league dates on the PLW calendar."}</p>
+    <p class="lede">${isTeam() ? `Tournaments and league dates. Once a Wizards game has a start time on the PLW calendar it shows up here. Recurring weeknight is chosen on <a href="#/availability">League</a> once six Wizards overlap.` : "Tournaments and league dates on the PLW calendar."}</p>
     ${isTeam() ? lock : ""}
     ${view === "calendar" ? renderCalendarMonth(events, monthKey, packs) : `<div class="timeline" style="margin-top:1rem">${list}</div>`}
   `;
