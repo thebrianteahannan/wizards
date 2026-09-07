@@ -178,6 +178,30 @@
       "role": "Player",
       "regular": false,
       "squads": ["league"]
+    },
+    {
+      "id": "zach-rosian",
+      "name": "Zach Rosian",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "New",
+      "role": "Player",
+      "regular": false,
+      "squads": ["league"]
+    },
+    {
+      "id": "louis-whalen",
+      "name": "Louis Whalen",
+      "number": null,
+      "positions": [],
+      "born": null,
+      "sex": "M",
+      "status": "New",
+      "role": "Player",
+      "regular": false,
+      "squads": ["league"]
     }
   ]
 }
