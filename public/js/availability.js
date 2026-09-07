@@ -287,7 +287,13 @@ function paintLiveDay(card, avail, roster) {
 }
 
 function firstWindowOffer(avail) {
-  const today = new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const today =
+    d.getFullYear() +
+    "-" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(d.getDate()).padStart(2, "0");
   return [...(avail.offers || [])]
     .filter((o) => o.date && o.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
@@ -336,15 +342,20 @@ function askFirstWindow(playerId, offer, avail, kind, onDone) {
       windows = [...form.querySelectorAll('input[name="win"]')].map((i) => i.value);
     }
     const msg = form.querySelector(".first-win-msg");
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    if (msg) msg.textContent = "Saving…";
     try {
-      await api.send("/api/availability/" + playerId, "PUT", {
+      const saved = await api.send("/api/availability/" + playerId, "PUT", {
         kind,
         days: { [day]: { status, windows: status === "no" ? [] : windows } },
       });
+      if (avail && saved && saved.players) avail.players = saved.players;
       wrap.remove();
       onDone(offer.date);
     } catch (err) {
-      if (msg) msg.textContent = err.message;
+      if (btn) btn.disabled = false;
+      if (msg) msg.textContent = err.message || "Could not save. Try again.";
     }
   });
 }

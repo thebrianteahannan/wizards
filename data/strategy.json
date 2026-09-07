@@ -1,5 +1,7 @@
 {
-  "lede": "How these games are actually decided. Keep it in the book so we play the same way.",
+  "lede": "How these games are actually decided. Patience plus PLW rules — not baseball habits. Keep it in the book so we play the same way.",
+  "why": "Walks knock pitchers out of the game. Heat in the zone is a ball. Defense is a 5-second throw in the air. That is what Adam Tanic and Tom Gannon keep winning with.",
+  "source": "From 150 PLW broadcasts (~431 hours) on YouTube, 2020–2026, plus recap shows. Live games are on twitch.tv/premierwiffle. Auto-captions are messy; quotes are cleaned from the booth.",
   "rules": [
     "Every at-bat starts 0–1. Six innings.",
     "Called strikes must read ≤55 mph and hit the K-zone in the air.",
@@ -8,5 +10,190 @@
     "Only official yellow Wiffle bats. Legal tape only.",
     "Motto: Play Hard. Have Fun. Respect All."
   ],
-  "pdf": "/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf"
+  "pdf": "/media/Wizards_of_Wiffs_PLW_Tournament_Aug1_2026.pdf",
+  "voices": [
+    {
+      "name": "Adam Tanic",
+      "role": "Commissioner · Sandvipers manager",
+      "blurb": "Patient to a fault: takes the first-pitch walk, red-light on 3–1, waits for ~49 mph, then goes opposite field. That oppo/middle look is how he avoids getting jammed — pitchers know it and still work him inside, so he makes midgame adjustments. As manager he stacks a table-setter in front of himself for RBIs. On the mound he throws strikes and lives on defense. Once the league got star-heavy, cookies with nobody on stopped working — locate and get ahead."
+    },
+    {
+      "name": "Tom Gannon",
+      "role": "Sandvipers ace · booth guest",
+      "blurb": "The eye the announcers point at when they teach the two-walk rule. Takes the close 3–2 rather than expand. Changes speeds, hides the full arsenal early so the league does not get a scouting report, and works the bottom of the K-zone. One walk can settle you. Two still ends the night."
+    }
+  ],
+  "playbook": [
+    {
+      "title": "Hitting",
+      "items": [
+        "Start every AB as if it is 0–2 mentally — it is already 0–1.",
+        "Do not swing at 55+ even if it looks like a strike. Sit ~49.",
+        "3–0 / 3–1 with nobody out: red light. Make him throw a strike.",
+        "Protect with two strikes, but a chase-and-whiff on 3–2 is how rallies die.",
+        "Walks move the lineup and knock starters out. Solos alone rarely win.",
+        "Opposite field is live. Tanic’s homers in these tapes are often the other way.",
+        "Not getting jammed is the other half of hitting. Hands inside, sit back, let it travel. See Don't get jammed below."
+      ]
+    },
+    {
+      "title": "Pitching and defense",
+      "items": [
+        "Live under 55 with movement. Screwballs and sliders dominate the booth talk.",
+        "Jam hitters: finish on the hands so they cannot extend. See Jam batters below.",
+        "Work the bottom of the 24×28.5 K-zone. Low misses are balls you survive.",
+        "Walk one: get timid, throw strikes. Walk two: you are done.",
+        "Do not show every pitch in game 1 of a season or a series.",
+        "On contact: pick it and throw in the air now. Five seconds is plenty if you start immediately.",
+        "Double play: middle panel of the backstop. Tag 2nd/3rd if that is the force.",
+        "An ace who cannot give you nine innings on a night leaves game 3 exposed."
+      ]
+    },
+    {
+      "title": "Jam batters",
+      "items": [
+        "Jam means throw inside so they cannot get the barrel out. Success is off the fist, no extension, a popup or a weak punch in the air.",
+        "Live on the inside half. Slider, screw, or two-seam that tunnels then buries on the hands last second — still under 55.",
+        "Finish on the fists, never the heart of the plate. Miss middle-in and that is the pitch they extend on.",
+        "After they just pulled one, jam the next swing. They are already thinking pull.",
+        "Lefty vs lefty: jam so they cannot open up. Leave it out over the plate and it goes over the container.",
+        "Change eye levels after you show inside — in, then down.",
+        "A jammed yellow bat can still flare. Off the hands is not always an out. Crowd the plate and miss the hands, it can be two runs.",
+        "If they sit oppo and keep their hands inside, a jam that does not actually finish on the fists is their barrel. Finish in, or mix away so they cannot sit inside."
+      ]
+    },
+    {
+      "title": "Don't get jammed",
+      "items": [
+        "Tanic's MO is sit back, let it travel, and look middle / opposite field. Pitchers work him inside because they know that. He still does it, then adjusts mid-game when they overcommit in.",
+        "Keep your hands inside the ball and close to your body. Do not swing the yellow bat like a baseball bat — drag it, don't turn and pull.",
+        "Stay back. The light bat gets you out in front of everything. Let it come so you can recognize the screw that starts middle then darts to your hands.",
+        "Do not dive in and reach for a pitch that looks away. That is how you get trapped: it comes back in, you are jammed, you roll over to short or pop it up.",
+        "Stay inside 12-to-6 and up-and-in too. If you don't, it rips foul. If you do, you can still poke it.",
+        "For pitchers: a hitter who sits oppo with quiet hands will barrel your 'jam' unless it actually gets to the fists. That's why location on the hands matters more than throwing inside-ish."
+      ]
+    }
+  ],
+  "quotes": [
+    {
+      "tip": "Jam: no extension",
+      "quote": "Working that slider inside to righties and jamming them up and not letting them get any extension on the ball and they're just kind of punching it up in the air.",
+      "who": "Snappers @ Cajuns, Week 7",
+      "href": "https://www.youtube.com/watch?v=LSsNCEHu_r8&t=2008s"
+    },
+    {
+      "tip": "Keep it on the hands",
+      "quote": "We jammed him. The difference was keeping the ball in on his hands now versus game one was over the plate a little more. He's looking to get extended.",
+      "who": "The Ones @ Night Owls, Week 4",
+      "href": "https://www.youtube.com/watch?v=h6Kp4XZUPX4&t=9817s"
+    },
+    {
+      "tip": "Jam after they pull",
+      "quote": "Ooh, jams him on that screw ball. Kind of got buried on his hands last second. He just hit a home run to the right side, so he's up there already thinking pull again — then that ball jammed him.",
+      "who": "Cajuns @ Legends, Week 2",
+      "href": "https://www.youtube.com/watch?v=9YAdinpgkgs&t=2132s"
+    },
+    {
+      "tip": "Lefty-lefty, jam or it flies",
+      "quote": "Lefty versus lefty — definitely gonna try to jam him a little bit. If you leave it to him opening up, there's gonna be a wiffle ball over the container.",
+      "who": "Warbirds @ Lightning, Week 2",
+      "href": "https://www.youtube.com/watch?v=dugm3Nn0XM0&t=2763s"
+    },
+    {
+      "tip": "Inside, then change eye levels",
+      "quote": "See if Macabee can jam him here. Oh he jammed it right back — definitely pitched inside on that one. Changing the eye levels.",
+      "who": "Gannon in the booth · Warbirds @ Snappers",
+      "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=5725s"
+    },
+    {
+      "tip": "Tanic sits oppo — so they jam him",
+      "quote": "Look for Tanic going opposite field right here. He always makes midgame adjustments. I think for the most part they've worked him inside. They know Tanic's MO of looking to go up the middle or left. They kind of want to jam him a little bit.",
+      "who": "2024 Championship · Sandvipers v Lightning",
+      "href": "https://www.youtube.com/watch?v=dFcRN4-QCjA&t=5997s"
+    },
+    {
+      "tip": "Hands close — don't reach",
+      "quote": "Screwball right in the middle of the plate, then an eight-inch sharp turn inside. He's diving in trying to go the other way and all of a sudden it's on your hands and you get jammed. You think it's out over the plate, you reach for it, and it traps you. Good hitters keep their hands close to the body and get some bat on it.",
+      "who": "The Ones @ Legends, Week 9",
+      "href": "https://www.youtube.com/watch?v=2boia-54dsk&t=8685s"
+    },
+    {
+      "tip": "Don't swing it like baseball",
+      "quote": "Good job keeping his hands inside the ball there — not getting out, not turning like a baseball bat, just kind of dragging.",
+      "who": "The Ones @ Legends, Week 9",
+      "href": "https://www.youtube.com/watch?v=2boia-54dsk&t=11709s"
+    },
+    {
+      "tip": "Sit back and let it travel",
+      "quote": "The hardest thing is being able to sit back. That little light bat — you can be out in front of a ton. Sitting back and letting it come opened me up a little bit, allowed me to see it, let it travel.",
+      "who": "Vaderz @ Warbirds, Week 7",
+      "href": "https://www.youtube.com/watch?v=ABhiNFbqe2c&t=9861s"
+    },
+    {
+      "tip": "Hands inside, then oppo",
+      "quote": "Keeps his hands inside the ball. Stay inside the ball and poke it. First and second, it's a home run or strikeout situation — or oppo.",
+      "who": "The Ones @ Night Owls, Week 4",
+      "href": "https://www.youtube.com/watch?v=h6Kp4XZUPX4&t=3240s"
+    },
+    {
+      "tip": "Two walks and you are done",
+      "quote": "What an eye — takes that walk, that's huge. Two walks in the PLW you cannot pitch the rest of the game. Close pitch, but a discerning eye from the veteran Tom Gannon.",
+      "who": "Sandvipers @ Vaderz, Opening Week",
+      "href": "https://www.youtube.com/watch?v=BMcnYAOQpQY&t=571s"
+    },
+    {
+      "tip": "Work the low K-zone",
+      "quote": "He's got to get that down. Low strike zone too — so you can get away with a lot of pitches that are very low.",
+      "who": "Gannon in the booth · Warbirds @ Snappers",
+      "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=916s"
+    },
+    {
+      "tip": "Take the walk if you have to",
+      "quote": "Greg is going to have to get one over the plate if he wants to stay in this game. You take the walk if you have to.",
+      "who": "Gannon in the booth · Warbirds @ Snappers",
+      "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=6785s"
+    },
+    {
+      "tip": "Over 55 is a ball even in the zone",
+      "quote": "A little bit fast at 57, over that 55 mile per hour speed limit. So even if that had hit the strike zone it would have been a ball.",
+      "who": "Booth with Gannon · Warbirds @ Snappers",
+      "href": "https://www.youtube.com/watch?v=Hc-dVqFT3RY&t=928s"
+    },
+    {
+      "tip": "Wait. Then go opposite field.",
+      "quote": "Tanic likes to wait patiently on this ball — gone. Tanic, opposite field.",
+      "who": "Sandvipers vs Vaderz, Opening Day",
+      "href": "https://www.youtube.com/watch?v=UZYVhah-vWY&t=7115s"
+    },
+    {
+      "tip": "On 3–1, red light",
+      "quote": "He's going to wait on something probably in the 49 mph range. Now on 3–1, you got to think he's got a red light with nobody out still. Make Tanic throw a strike.",
+      "who": "2024 Championship · Sandvipers v Lightning",
+      "href": "https://www.youtube.com/watch?v=dFcRN4-QCjA&t=713s"
+    },
+    {
+      "tip": "Two-strike protect, but don't chase",
+      "quote": "It's important to walk there. You want to protect on two strikes, but you got to have strike zone recognition — going down waving at that 3–2 pitch out of the zone.",
+      "who": "Bombers @ Vaderz, Week 8",
+      "href": "https://www.youtube.com/watch?v=nkq3-5HTy1g&t=3589s"
+    },
+    {
+      "tip": "Five seconds is an eternity",
+      "quote": "Plenty of time, knocked it down, still got all day. Five seconds is an eternity. You don't run to first. Five seconds is what you have. Hit the backstop in the air.",
+      "who": "Sandvipers @ Vaderz, Opening Week",
+      "href": "https://www.youtube.com/watch?v=BMcnYAOQpQY&t=4023s"
+    },
+    {
+      "tip": "Pitching staffs win titles",
+      "quote": "The good for the Cajuns is the pitching staff, 100%. When that team does not hit, their pitching staff is going to hold it down. I think that alone is going to be enough to take a team to the championship.",
+      "who": "Week 5 Recap & Power Rankings",
+      "href": "https://www.youtube.com/watch?v=yfJpswShiBg&t=3365s"
+    },
+    {
+      "tip": "A walk can settle a pitcher",
+      "quote": "Sometimes you need to get that walk out. I talked to Gannon before — and sometimes that walk actually improves your game because it's going to make you pitch even better.",
+      "who": "Booth citing Gannon · Ones @ Lightning, Week 17",
+      "href": "https://www.youtube.com/watch?v=7sVkzqJPHjM&t=5113s"
+    }
+  ]
 }

@@ -333,24 +333,6 @@ function renderLeague() {
   `;
 }
 
-function renderStrategy(data) {
-  data = data || {};
-  const rules = (data.rules || []).map((r) => `<li>${escapeHtml(r)}</li>`).join("");
-  const pdf = data.pdf
-    ? `<p><a href="${escapeHtml(data.pdf)}" target="_blank" rel="noopener">August 1 tournament packet (PDF)</a></p>`
-    : "";
-  return `
-    <p class="kicker">Team only</p>
-    <h1>Strategy</h1>
-    <p class="lede">${escapeHtml(data.lede || "")}</p>
-    <section class="card" style="max-width:40rem">
-      <h2>Rules that decide games</h2>
-      <ul class="rules">${rules}</ul>
-      ${pdf}
-    </section>
-  `;
-}
-
 function cap(word) {
   return String(word || "").replace(/^\w/, (c) => c.toUpperCase());
 }

@@ -125,16 +125,44 @@ app.get("/api/availability", async (req, res) => {
   let avail = await readJson(AVAIL_FILES[kind]);
   if (kind === "league") {
     try {
-      const before = JSON.stringify(avail.offers || []);
+      const beforeOffers = JSON.stringify(avail.offers || []);
       const synced = await syncLeagueOffers(avail, { refresh: req.query.refresh === "1" });
-      avail = synced.avail;
-      if (!synced.error && JSON.stringify(avail.offers || []) !== before) {
-        await writeJson("availability.json", avail);
+      if (!synced.error) {
+        const latest = await readJson("availability.json");
+        latest.offers = synced.avail.offers;
+        const migrated = migrateWeekdayAnswers(latest);
+        avail = migrated.avail;
+        if (JSON.stringify(avail.offers || []) !== beforeOffers || migrated.changed) {
+          await writeJson("availability.json", avail);
+        }
       }
     } catch (_) {}
   }
   res.json(avail);
 });
+
+function migrateWeekdayAnswers(avail) {
+  const weekdays = new Set(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]);
+  const upcoming = [...(avail.offers || [])]
+    .filter((o) => o && o.date && o.day)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  let changed = false;
+  for (const p of Object.values(avail.players || {})) {
+    const days = p.days || {};
+    for (const key of Object.keys(days)) {
+      if (!weekdays.has(key)) continue;
+      const target = upcoming.find((o) => o.day === key && !days[o.date]);
+      if (target) {
+        days[target.date] = days[key];
+        changed = true;
+      }
+      delete days[key];
+      changed = true;
+    }
+    p.days = days;
+  }
+  return { avail, changed };
+}
 
 function clockLabel(t) {
   const m = String(t || "").match(/^(\d{1,2}):(\d{2})$/);
