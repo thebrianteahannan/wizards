@@ -198,6 +198,7 @@ function renderUsers(admin) {
             ${u.role === "admin"
               ? `<button class="btn ghost" type="button" data-role="${escapeHtml(u.id)}" data-next="team">Make player</button>`
               : `<button class="btn ghost" type="button" data-role="${escapeHtml(u.id)}" data-next="admin">Make admin</button>`}
+            <button class="btn ghost" type="button" data-delete-user="${escapeHtml(u.id)}" data-name="${escapeHtml(u.username)}">Delete</button>
           </p>
         </div>
       </article>`;
@@ -210,7 +211,7 @@ function renderUsers(admin) {
       <p>Invite code for new Wizards: <strong id="invite-code">${escapeHtml(admin.inviteCode || "—")}</strong>
         <button class="btn ghost" type="button" id="copy-invite">Copy</button>
         <button class="btn ghost" type="button" id="rotate-invite">New code</button></p>
-      <p class="muted">Text the code to someone when they join. Rotate it if a code leaked. Revoke a login if they go to another team.</p>
+      <p class="muted">Text the code to someone when they join. Rotate it if a code leaked. Revoke a login if they leave. Delete removes them completely so they can sign up again.</p>
       <p id="users-msg" class="muted"></p>
     </section>
     ${resets ? `<h2 style="margin-top:1.2rem">Password reset requests</h2><div class="timeline">${resets}</div>` : ""}
@@ -273,6 +274,18 @@ function bindUsers() {
     btn.addEventListener("click", async () => {
       try {
         await api.send("/api/auth/restore", "POST", { userId: btn.dataset.restore });
+        await reloadUsers();
+      } catch (err) {
+        if (msg) msg.textContent = err.message;
+      }
+    });
+  });
+  document.querySelectorAll("[data-delete-user]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.name || "this login";
+      if (!confirm("Permanently delete " + name + "'s login? They can sign up again with the invite code.")) return;
+      try {
+        await api.send("/api/auth/delete", "POST", { userId: btn.dataset.deleteUser });
         await reloadUsers();
       } catch (err) {
         if (msg) msg.textContent = err.message;

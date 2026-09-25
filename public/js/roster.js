@@ -1,11 +1,3 @@
-function playerSquads(p) {
-  const s = p && p.squads;
-  return s && s.length ? s.slice() : ["league", "tournament"];
-}
-
-function onSquad(p, squad) {
-  return playerSquads(p).includes(squad);
-}
 function nextProposed(avail) {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = [...(avail.offers || [])]
@@ -31,9 +23,9 @@ function playerMark(avail, playerId, offer, kind) {
   return entry.status === "yes" || entry.status === "maybe" ? entry.status : "";
 }
 
-function rosterRows(players, squad, dead) {
+function rosterRows(players, dead) {
   const admin = isAdmin();
-  const lastCol = admin ? (dead ? "11.5rem" : "9.5rem") : "5.2rem";
+  const lastCol = admin ? (dead ? "11.5rem" : "6.8rem") : "5.2rem";
   const offStatuses = [
     { status: "IR", label: "IR" },
     { status: "New", label: "New" },
@@ -42,7 +34,6 @@ function rosterRows(players, squad, dead) {
   return players
     .map((p, i) => {
       const pos = (p.positions || []).join(", ") || "Util";
-      const inBook = dead || squad === "tournament" || onSquad(p, squad);
       const cur = typeof rosterStatus === "function" ? rosterStatus(p) : p.status || "Active";
       const limits = String(p.limits || "").trim();
       const tag = !dead && admin
@@ -64,28 +55,24 @@ function rosterRows(players, squad, dead) {
         const label = typeof rosterStatusLabel === "function" ? rosterStatusLabel(cur) : cur;
         last = `<span class="muted">${escapeHtml(label)}</span>`;
       } else if (admin) {
-        last = `<span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:0.12rem">${["league", "tournament"]
-          .map((book) => {
-            const on = onSquad(p, book);
-            return `<button type="button" class="btn ghost" data-squad-set="${escapeHtml(p.id)}" data-book="${book}" style="padding:0.08rem 0.28rem;font-size:0.62rem${on ? "" : ";opacity:0.4"}">${book === "league" ? "L" : "T"}</button>`;
-          })
-          .join("")}${offStatuses
+        last = `<span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:0.12rem">${offStatuses
           .map((s) => `<button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}" style="padding:0.08rem 0.28rem;font-size:0.62rem">${s.label}</button>`)
           .join("")}</span>`;
       } else {
-        last = `<span class="muted">${inBook ? (p.born ? escapeHtml(p.born) : "") : squad === "league" ? "Not league" : "Not tourney"}</span>`;
+        last = `<span class="muted">${p.born ? escapeHtml(p.born) : ""}</span>`;
       }
-      const when = !dead
+      const when = !dead && limits
         ? admin
-          ? `<button type="button" class="muted" data-edit-limits="${escapeHtml(p.id)}" style="display:block;width:100%;text-align:left;background:none;border:0;padding:0;margin:0.12rem 0 0;font:inherit;font-size:0.68rem;line-height:1.25;cursor:pointer;white-space:normal">${limits ? escapeHtml(limits) : "Availability…"}</button>`
-          : limits
-          ? `<span class="muted" style="display:block;margin-top:0.12rem;font-size:0.68rem;line-height:1.25;white-space:normal">${escapeHtml(limits)}</span>`
-          : ""
+          ? `<button type="button" class="muted roster-limits" data-edit-limits="${escapeHtml(p.id)}" title="${escapeHtml(limits)}">${escapeHtml(limits)}</button>`
+          : `<span class="muted roster-limits" title="${escapeHtml(limits)}">${escapeHtml(limits)}</span>`
+        : "";
+      const nameBtn = admin && !dead && !limits
+        ? ` data-edit-limits="${escapeHtml(p.id)}" title="Add availability" style="cursor:pointer"`
         : "";
       return `
-        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem ${lastCol};${inBook && !dead ? "" : "opacity:0.55"}">
+        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem ${lastCol};${dead ? "opacity:0.55" : ""}">
           <span class="num">${i + 1}</span>
-          <span style="min-width:0"><strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.name)}</strong>${when}</span>
+          <span class="roster-who"><strong${nameBtn}>${escapeHtml(p.name)}</strong>${when}</span>
           <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
           ${tag}
           ${last}
@@ -252,16 +239,18 @@ function bindLimitsEditor(root, roster, onSaved) {
   });
 }
 
-function pitcherKey(squad) {
-  return "wizardsPitcher-" + (squad === "tournament" ? "tournament" : "league");
+function pitcherKey(kind) {
+  if (kind === "tournament") return "wizardsPitcher-tournament";
+  if (kind === "league") return "wizardsPitcher-league";
+  return "wizardsPitcher";
 }
 function pitcherArms(players) {
   return players.filter((p) => (p.positions || []).includes("P") || p.id === "jose-gonzalez" || p.id === "cam");
 }
 
-function pickPitcherId(players, squad) {
+function pickPitcherId(players, kind) {
   const arms = pitcherArms(players);
-  const saved = localStorage.getItem(pitcherKey(squad));
+  const saved = localStorage.getItem(pitcherKey(kind));
   if (saved && players.some((p) => p.id === saved)) return saved;
   return (arms[0] || players[0] || {}).id || "";
 }
@@ -489,92 +478,59 @@ function paintAvailDiamond(card, roster, avail, kind, offer, toggle) {
   }
 }
 
-function renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, heading) {
-  squad = squad === "tournament" ? "tournament" : "league";
+function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading) {
   const active = roster.players.filter(isActive);
-  const leagueOn = squad === "league";
-  const field = leagueOn ? active.filter((p) => onSquad(p, "league")) : active;
   const inactive = roster.players.filter((p) => !isActive(p));
-  const avail = leagueOn ? leagueAvail || {} : tourneyAvail || {};
+  const leagueOffer = nextProposed(leagueAvail || {});
+  const tourneyOffer = nextProposed(tourneyAvail || {});
+  const avail = !leagueOffer || (tourneyOffer && tourneyOffer.date < leagueOffer.date) ? tourneyAvail || {} : leagueAvail || {};
   const offer = nextProposed(avail);
   const marks = {};
   if (offer) {
-    for (const p of field) marks[p.id] = playerMark(avail, p.id, offer, squad);
+    for (const p of active) marks[p.id] = playerMark(avail, p.id, offer);
   }
-  const pitcherId = pickPitcherId(field, squad);
-  const blurb = leagueOn
-    ? `Florida Challengers League · need 6 to take a night · ${field.length} of 12 counting`
-    : `PLW Saturday events · Aug 1 packet and onward · ${field.length} counting`;
+  const pitcherId = pickPitcherId(active);
   const title = heading === "h2" ? "h2" : "h1";
   return `
-    <div id="roster-embed" data-svg="${escapeHtml(svgId || "dg-roster")}" data-book="${escapeHtml(squad)}">
+    <div id="roster-embed" data-svg="${escapeHtml(svgId || "dg-roster")}">
       <div class="sched-bar">
         <div>
           <p class="kicker">${escapeHtml(roster.league)} · ${escapeHtml(roster.season)}</p>
           <${title}>Roster</${title}>
         </div>
-        <div class="squad-switch" role="group" aria-label="Roster type">
-          <button type="button" class="btn ${leagueOn ? "" : "ghost"}" data-squad="league">League</button>
-          <button type="button" class="btn ${leagueOn ? "ghost" : ""}" data-squad="tournament">Tournament</button>
-        </div>
       </div>
-      <p class="muted">${blurb}</p>
+      <p class="muted">Locked roster · need 6 to take a night · ${active.length} on the book</p>
       <div class="roster-layout">
-        ${rosterDiamond(field, svgId || "dg-roster", marks, offer, pitcherId)}
-        <div class="roster-list">${rosterRows(field, squad)}</div>
+        ${rosterDiamond(active, svgId || "dg-roster", marks, offer, pitcherId)}
+        <div class="roster-list">${rosterRows(active)}</div>
       </div>
-      ${leagueOn && inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Sideline · IR / New / Away</p>${rosterRows(inactive, squad, true)}</div>` : ""}
+      ${inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Sideline · IR / New / Away</p>${rosterRows(inactive, true)}</div>` : ""}
     </div>
   `;
 }
-function renderRoster(roster, squad, leagueAvail, tourneyAvail) {
+function renderRoster(roster, leagueAvail, tourneyAvail) {
   return `
-    <p class="lede">One Wizards book. League and Tournament only change which dates light up on the diamond. Co-managers: Tony Kurtanick and Brian Hannan.</p>
+    <p class="lede">One locked Wizards roster. Co-managers: Tony Kurtanick and Brian Hannan.</p>
     ${isTeam() ? `<div class="actions" style="margin:0.7rem 0 0"><button class="btn ghost" type="button" id="show-phones">Phone numbers</button></div><div id="phone-list" class="card phone-list" hidden></div>` : ""}
-    ${renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, "dg-roster", "h1")}
+    ${renderRosterEmbed(roster, leagueAvail, tourneyAvail, "dg-roster", "h1")}
     <div id="offense-host"></div>
     <div id="pitching-host"></div>
   `;
 }
 
 function bindRoster(roster, leagueAvail, tourneyAvail) {
-  const redraw = (squad) => {
-    localStorage.setItem("wizardsRosterSquad", squad);
+  const redraw = () => {
     const box = document.getElementById("roster-embed");
     const svgId = (box && box.dataset.svg) || "dg-roster";
     const heading = box && box.querySelector("h2") ? "h2" : "h1";
-    if (box) box.outerHTML = renderRosterEmbed(roster, squad, leagueAvail, tourneyAvail, svgId, heading);
+    if (box) box.outerHTML = renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading);
     bindRoster(roster, leagueAvail, tourneyAvail);
     if (window.bootVisuals) window.bootVisuals();
   };
-  document.querySelectorAll("button[data-squad]").forEach((btn) => {
-    btn.addEventListener("click", () => redraw(btn.dataset.squad));
-  });
-  document.querySelectorAll("[data-pitcher]").forEach((btn) => {
+  document.querySelectorAll("#roster-embed [data-pitcher]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const box = document.getElementById("roster-embed");
-      const squad = (box && box.dataset.book) === "tournament" ? "tournament" : "league";
-      localStorage.setItem(pitcherKey(squad), btn.dataset.pitcher);
-      redraw(squad);
-    });
-  });
-  document.querySelectorAll("[data-squad-set]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const p = roster.players.find((x) => x.id === btn.dataset.squadSet);
-      if (!p) return;
-      const book = btn.dataset.book;
-      const next = playerSquads(p);
-      const i = next.indexOf(book);
-      if (i >= 0) next.splice(i, 1);
-      else next.push(book);
-      try {
-        const saved = await api.send("/api/roster/" + p.id + "/squads", "PUT", { squads: next });
-        roster.players = saved.players || roster.players;
-        const box = document.getElementById("roster-embed");
-        redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
-      } catch (err) {
-        alert(err.message);
-      }
+      localStorage.setItem(pitcherKey(), btn.dataset.pitcher);
+      redraw();
     });
   });
   document.querySelectorAll("[data-status-set]").forEach((btn) => {
@@ -584,8 +540,7 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
       try {
         const saved = await api.send("/api/roster/" + p.id + "/status", "PUT", { status: btn.dataset.status });
         Object.assign(roster, saved);
-        const box = document.getElementById("roster-embed");
-        redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
+        redraw();
       } catch (err) {
         alert(err.message);
       }
@@ -599,21 +554,14 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
       try {
         const saved = await api.send("/api/roster/" + p.id, "DELETE");
         Object.assign(roster, saved);
-        const box = document.getElementById("roster-embed");
-        redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
+        redraw();
       } catch (err) {
         alert(err.message);
       }
     });
   });
-  bindPosEditor(document.getElementById("roster-embed"), roster, () => {
-    const box = document.getElementById("roster-embed");
-    redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
-  });
-  bindLimitsEditor(document.getElementById("roster-embed"), roster, () => {
-    const box = document.getElementById("roster-embed");
-    redraw((box && box.dataset.book) === "tournament" ? "tournament" : "league");
-  });
+  bindPosEditor(document.getElementById("roster-embed"), roster, redraw);
+  bindLimitsEditor(document.getElementById("roster-embed"), roster, redraw);
   bindPhones(roster);
   if (typeof loadOffense === "function") loadOffense(roster);
 }

@@ -28,7 +28,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
     ? `<a class="btn" href="#/availability">Set your days</a><a class="btn ghost" href="#/board">Announcements</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`
     : `<a class="btn" href="#/join">Join the team</a><a class="btn ghost" href="#/roster">Roster</a><a class="btn ghost" href="#/league">Watch PLW live</a>`;
   const nightCard = team
-    ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>League</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
+    ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>Match days</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
     : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>PLW Info</h3><p class="muted">Fall tryouts. Real League in January.</p></a>`;
   const duesCard = team
     ? `<a class="card feature" href="#/dues"><span class="icon">$</span><h3>Dues</h3><p class="muted">${fees && fees.model === "flat" ? money(fees.flatAmount) + " flat for the year" : "$250 team bill"}</p></a>`
@@ -99,7 +99,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
       ${duesStat}
     </section>
     <section style="margin-top:1.2rem">
-      ${renderRosterEmbed(roster, localStorage.getItem("wizardsRosterSquad"), avail, tourneyAvail, "dg-home", "h2")}
+      ${renderRosterEmbed(roster, avail, tourneyAvail, "dg-home", "h2")}
     </section>
     <section class="grid-2" style="margin-top:1rem">
       <article class="card">
@@ -145,7 +145,7 @@ function renderSchedule(schedule, avail, view, monthKey, packs) {
       <article class="event ${e.status}">
         <time datetime="${escapeHtml(e.date)}">${fmtDate(e.date)}</time>
         <div>
-          <div class="kind">${escapeHtml(e.kind)} · ${escapeHtml(e.status)}</div>
+          <div class="kind">${escapeHtml(e.kind)} · ${escapeHtml(e.status)}${typeof eventRecord === "function" && eventRecord(e) ? " · " + escapeHtml(eventRecord(e).label) : ""}</div>
           <h3>${escapeHtml(e.title)}</h3>
           ${typeof schedFavorHtml === "function" ? schedFavorHtml(e, packs && packs.book) : ""}
           <p>${escapeHtml(e.when)}${e.detail ? ` <span class="muted">· ${escapeHtml(e.detail)}</span>` : ""}${e.link ? ` · <a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch</a>` : ""}</p>
@@ -160,7 +160,7 @@ function renderSchedule(schedule, avail, view, monthKey, packs) {
       </div>
       <button class="btn ghost" type="button" id="sched-view">${view === "calendar" ? "List view" : "Calendar view"}</button>
     </div>
-    <p class="lede">${isTeam() ? `Tournaments and league dates. Once a Wizards game has a start time on the PLW calendar it shows up here. Recurring weeknight is chosen on <a href="#/availability">League</a> once six Wizards overlap.` : "Tournaments and league dates on the PLW calendar."}</p>
+    <p class="lede">${isTeam() ? `Wizards games and open PLW nights. The number is who said yes — tap a night to mark yourself. Recurring weeknight is chosen on <a href="#/availability">Match days</a> once six overlap.` : "Tournaments, league dates, and open PLW nights we could still take."}</p>
     ${isTeam() ? lock : ""}
     ${view === "calendar" ? renderCalendarMonth(events, monthKey, packs) : `<div class="timeline" style="margin-top:1rem">${list}</div>`}
   `;
@@ -420,12 +420,12 @@ function wizLeagueRankTag(teams) {
 
 function recruitNeedTag(roster) {
   const players = (roster && roster.players) || [];
-  const n = players.filter((p) => isActive(p) && (typeof onSquad !== "function" || onSquad(p, "league"))).length;
+  const n = players.filter((p) => isActive(p)).length;
   return n < 12 ? "Looking for more players" : "";
 }
 
 function recruitQueueTag(data) {
-  const n = ((data && data.recruits) || []).length;
+  const n = ((data && data.recruits) || []).filter((r) => !r.archivedAt).length;
   return n ? (n === 1 ? "1 in queue" : n + " in queue") : "";
 }
 
@@ -441,10 +441,9 @@ function latestAnnounceTag(board) {
 function renderTeamHub(favTag, tourneyTag, pracTag, rankTag, tRankTag, recruitTag, queueTag, announceTag) {
   const cards = [
     ["#/board", "◉", "Announcements", "Board notes for the club.", announceTag],
-    ["#/availability", "◷", "League", "Mark nights. Need 6 yes at the same time.", ["Set your days", favTag].filter(Boolean)],
+    ["#/availability", "◷", "Match days", "League nights and tournaments. Need 6 yes at the same time.", ["Set your days", favTag, tourneyTag].filter(Boolean)],
     ["#/scout", "▦", "League rankings", "Overview and every Challengers club.", rankTag],
     ["#/tourney-scout", "▣", "Tournament rankings", "Each event, plus an overall tally.", tRankTag],
-    ["#/tournament", "✸", "Tournament", "Who can play each tournament date.", ["Set your days", tourneyTag].filter(Boolean)],
     ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no.", pracTag],
     ["#/gear", "✦", "Gear", "Jersey number and size."],
     ["#/join", "+", "Recruit", "Put someone in the book.", recruitTag],
@@ -472,7 +471,7 @@ function renderTeamHub(favTag, tourneyTag, pracTag, rankTag, tRankTag, recruitTa
   return `
     <p class="kicker">Locker room</p>
     <h1>Private Team</h1>
-    <p class="lede">League, tournament, practice, gear, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
+    <p class="lede">Match days, practice, gear, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
     <section class="grid-3" style="margin-top:1.2rem">${cards}</section>
   `;
 }

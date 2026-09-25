@@ -54,6 +54,24 @@ function isClock(status) {
   return /\b\d{1,2}:\d{2}\s*(AM|PM)\b/i.test(String(status || ""));
 }
 
+function isScore(status) {
+  return /^\d+\s*-\s*\d+$/.test(String(status || "").trim());
+}
+
+function parseScorePair(status) {
+  const m = String(status || "").trim().match(/^(\d+)\s*-\s*(\d+)$/);
+  if (!m) return null;
+  return { away: Number(m[1]), home: Number(m[2]) };
+}
+
+function wizGameOutcome(g) {
+  const pair = parseScorePair(g && g.time);
+  if (!pair || (g.away !== "WIZ" && g.home !== "WIZ")) return null;
+  const us = g.home === "WIZ" ? pair.home : pair.away;
+  const them = g.home === "WIZ" ? pair.away : pair.home;
+  return { us, them, mark: us > them ? "W" : us < them ? "L" : "T" };
+}
+
 function normalizeTime(status) {
   const m = String(status || "").match(/(\d{1,2}:\d{2})\s*(AM|PM)/i);
   if (!m) return "";
@@ -85,11 +103,31 @@ function viewFields(html) {
   };
 }
 
-function nextMonthArg(html) {
+function monthArg(html, title) {
   const m = String(html || "").match(
-    /__doPostBack\('ctl00\$maincontent\$calMonthlySchedule','(V\d+)'\)"[^>]*title="Go to the next month"/
+    new RegExp(`__doPostBack\\('ctl00\\$maincontent\\$calMonthlySchedule','(V\\d+)'\\)"[^>]*title="${title}"`)
   );
   return m ? m[1] : "";
+}
+
+function nextMonthArg(html) {
+  return monthArg(html, "Go to the next month");
+}
+
+function prevMonthArg(html) {
+  return monthArg(html, "Go to the previous month");
+}
+
+async function fetchPostedMonth(baseHtml, arg) {
+  if (!arg) return [];
+  const fields = viewFields(baseHtml);
+  const body = new URLSearchParams({
+    ...fields,
+    __EVENTTARGET: "ctl00$maincontent$calMonthlySchedule",
+    __EVENTARGUMENT: arg,
+  });
+  const page = await fetchHtml(CAL_URL, body.toString());
+  return parseMonthNights(page);
 }
 
 function parseMonthNights(html) {
@@ -130,9 +168,9 @@ function parseMonthNights(html) {
       const away = g[1].trim();
       const status = g[2].trim();
       const home = g[3].trim();
-      if (!isClock(status)) continue;
+      if (!isClock(status) && !isScore(status)) continue;
       if (![away, home].some((t) => t === "WIZ" || t === "TBD")) continue;
-      const time = normalizeTime(status);
+      const time = isClock(status) ? normalizeTime(status) : String(status).trim();
       if (!time) continue;
       const row = byDate[date] || (byDate[date] = { date, games: [] });
       row.games.push({ away, home, time });
@@ -186,29 +224,25 @@ function offerFromNight(night) {
   };
 }
 
+function mergeNights(into, extra) {
+  for (const n of extra || []) {
+    if (!into.some((x) => x.date === n.date)) into.push(n);
+  }
+}
+
 async function loadCalendarNights(force) {
   if (!force && cache.nights && Date.now() - cache.at < 10 * 60 * 1000) return cache.nights;
   const first = await fetchHtml(CAL_URL);
   const nights = parseMonthNights(first);
-  const nextArg = nextMonthArg(first);
-  if (nextArg) {
-    try {
-      const fields = viewFields(first);
-      const body = new URLSearchParams({
-        ...fields,
-        __EVENTTARGET: "ctl00$maincontent$calMonthlySchedule",
-        __EVENTARGUMENT: nextArg,
-      });
-      const second = await fetchHtml(CAL_URL, body.toString());
-      for (const n of parseMonthNights(second)) {
-        if (!nights.some((x) => x.date === n.date)) nights.push(n);
-      }
-    } catch (_) {}
-  }
-  const today = todayStamp();
-  const upcoming = nights.filter((n) => n.date >= today).sort((a, b) => a.date.localeCompare(b.date));
-  cache = { at: Date.now(), nights: upcoming, error: "" };
-  return upcoming;
+  try {
+    mergeNights(nights, await fetchPostedMonth(first, prevMonthArg(first)));
+  } catch (_) {}
+  try {
+    mergeNights(nights, await fetchPostedMonth(first, nextMonthArg(first)));
+  } catch (_) {}
+  nights.sort((a, b) => a.date.localeCompare(b.date));
+  cache = { at: Date.now(), nights, error: "" };
+  return nights;
 }
 
 async function syncLeagueOffers(avail, opts) {
@@ -221,7 +255,9 @@ async function syncLeagueOffers(avail, opts) {
     return { avail, synced: 0, error: cache.error };
   }
   const today = todayStamp();
-  const nextOffers = nights.map(offerFromNight);
+  const nextOffers = nights
+    .filter((n) => n.date >= today && (n.games || []).some((g) => isClock(g.time)))
+    .map(offerFromNight);
   const keep = (avail.offers || []).filter(
     (o) => o && o.source !== "mystats" && (!o.date || o.date >= today)
   );
@@ -241,20 +277,48 @@ function eventFromWizNight(night) {
   const them = wiz.away === "WIZ" ? wiz.home : wiz.away;
   const title = wiz.home === "WIZ" ? teamName(them) + " vs Wizards" : "Wizards vs " + teamName(them);
   const today = todayStamp();
-  return {
+  const clocks = games.map((g) => g.time).filter(isClock);
+  const scores = games.map((g) => g.time).filter(isScore);
+  const outcomes = games.map(wizGameOutcome).filter(Boolean);
+  const wins = outcomes.filter((o) => o.mark === "W").length;
+  const losses = outcomes.filter((o) => o.mark === "L").length;
+  const ties = outcomes.filter((o) => o.mark === "T").length;
+  const played = night.date < today || (scores.length > 0 && !clocks.length);
+  const rec = played && outcomes.length ? (ties ? wins + "-" + losses + "-" + ties : wins + "-" + losses) : "";
+  const mark = played && outcomes.length ? (wins > losses ? "W" : wins < losses ? "L" : "T") : "";
+  const ev = {
     id: "plw-" + night.date,
     date: night.date,
     title,
-    when: formatTimes(games.map((g) => g.time)),
+    when: clocks.length ? formatTimes(clocks) : scores.join(" · "),
     kind: "league",
-    status: night.date < today ? "played" : "upcoming",
-    detail: "Locked on the PLW MyStats calendar.",
+    status: played ? "played" : "upcoming",
+    detail: played ? "Final on the PLW calendar." : "Locked on the PLW MyStats calendar.",
     source: "mystats",
   };
+  if (played && outcomes.length) {
+    ev.wins = wins;
+    ev.losses = losses;
+    ev.ties = ties;
+    ev.result = mark;
+    ev.record = rec;
+  }
+  return ev;
 }
 
 function sameEvent(a, b) {
-  return a.title === b.title && a.when === b.when && a.status === b.status && a.detail === b.detail && a.source === b.source;
+  return (
+    a.title === b.title &&
+    a.when === b.when &&
+    a.status === b.status &&
+    a.detail === b.detail &&
+    a.source === b.source &&
+    a.wins === b.wins &&
+    a.losses === b.losses &&
+    a.ties === b.ties &&
+    a.result === b.result &&
+    a.record === b.record
+  );
 }
 
 async function syncScheduleEvents(schedule, opts) {
@@ -287,7 +351,19 @@ async function syncScheduleEvents(schedule, opts) {
     }
     const j = kept.findIndex((e) => e && e.date === ev.date && e.kind === "league");
     if (j >= 0) {
-      const merged = { ...kept[j], title: ev.title, when: ev.when, status: ev.status, detail: ev.detail, source: "mystats" };
+      const merged = {
+        ...kept[j],
+        title: ev.title,
+        when: ev.when,
+        status: ev.status,
+        detail: ev.detail,
+        source: "mystats",
+        wins: ev.wins,
+        losses: ev.losses,
+        ties: ev.ties,
+        result: ev.result,
+        record: ev.record,
+      };
       if (!sameEvent(kept[j], merged)) {
         kept[j] = merged;
         changed = true;

@@ -393,16 +393,6 @@ app.put("/api/roster/batting", requireAdmin, async (req, res) => {
   res.json(roster);
 });
 
-app.put("/api/roster/:id/squads", requireAdmin, async (req, res) => {
-  const { roster, map } = await rosterById();
-  const player = map[req.params.id];
-  if (!player) return res.status(404).json({ error: "Unknown player" });
-  const raw = Array.isArray(req.body && req.body.squads) ? req.body.squads.map(String) : [];
-  player.squads = raw.filter((s) => s === "league" || s === "tournament");
-  await writeJson("roster.json", roster);
-  res.json(roster);
-});
-
 app.put("/api/roster/:id/positions", requireAdmin, async (req, res) => {
   const { roster, map } = await rosterById();
   const player = map[req.params.id];
@@ -524,6 +514,12 @@ function parseRecruit(body, requirePhone) {
   };
 }
 
+function recruitDupKey(r) {
+  const name = String((r && r.firstName) || "").trim().toLowerCase() + "\n" + String((r && r.lastName) || "").trim().toLowerCase();
+  const phone = String((r && r.phone) || "").replace(/\D/g, "");
+  return phone ? name + "\n" + phone : "";
+}
+
 app.get("/api/recruits", requireTeam, async (_req, res) => {
   res.json(await readJson("recruits.json"));
 });
@@ -532,12 +528,16 @@ app.post("/api/recruits", async (req, res) => {
   const parsed = parseRecruit(req.body, true);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
   const data = await readJson("recruits.json");
-  data.recruits.unshift({
-    id: "r" + Date.now(),
-    ...parsed.value,
-    createdAt: new Date().toISOString(),
-  });
-  await writeJson("recruits.json", data);
+  const key = recruitDupKey(parsed.value);
+  const dup = key && (data.recruits || []).some((r) => !r.archivedAt && recruitDupKey(r) === key);
+  if (!dup) {
+    data.recruits.unshift({
+      id: "r" + Date.now(),
+      ...parsed.value,
+      createdAt: new Date().toISOString(),
+    });
+    await writeJson("recruits.json", data);
+  }
   res.json(data);
 });
 
@@ -552,6 +552,35 @@ app.put("/api/recruits/:id", requireTeam, async (req, res) => {
     ...parsed.value,
     updatedAt: new Date().toISOString(),
   };
+  await writeJson("recruits.json", data);
+  res.json(data);
+});
+
+app.delete("/api/recruits/:id", requireTeam, async (req, res) => {
+  const data = await readJson("recruits.json");
+  const i = data.recruits.findIndex((r) => r.id === req.params.id);
+  if (i < 0) return res.status(404).json({ error: "Unknown recruit" });
+  data.recruits.splice(i, 1);
+  await writeJson("recruits.json", data);
+  res.json(data);
+});
+
+app.post("/api/recruits/:id/archive", requireTeam, async (req, res) => {
+  const data = await readJson("recruits.json");
+  const r = (data.recruits || []).find((x) => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: "Unknown recruit" });
+  r.archivedAt = r.archivedAt || new Date().toISOString();
+  r.updatedAt = new Date().toISOString();
+  await writeJson("recruits.json", data);
+  res.json(data);
+});
+
+app.post("/api/recruits/:id/unarchive", requireTeam, async (req, res) => {
+  const data = await readJson("recruits.json");
+  const r = (data.recruits || []).find((x) => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: "Unknown recruit" });
+  delete r.archivedAt;
+  r.updatedAt = new Date().toISOString();
   await writeJson("recruits.json", data);
   res.json(data);
 });

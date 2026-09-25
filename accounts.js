@@ -350,6 +350,24 @@ function attachAuth(app) {
     res.json({ ok: true });
   });
 
+  app.post("/api/auth/delete", requireAdmin, async (req, res) => {
+    const id = String((req.body && req.body.userId) || "");
+    const data = await loadAccounts();
+    const i = data.users.findIndex((u) => u.id === id);
+    if (i < 0) return res.status(404).json({ error: "Unknown user" });
+    const user = data.users[i];
+    if (user.id === req.user.id) return res.status(400).json({ error: "You cannot delete yourself" });
+    const admins = data.users.filter((u) => u.role === "admin" && u.active);
+    if (user.role === "admin" && user.active && admins.length < 2) {
+      return res.status(400).json({ error: "Keep at least one admin" });
+    }
+    data.users.splice(i, 1);
+    data.sessions = data.sessions.filter((s) => s.userId !== id);
+    data.resets = data.resets.filter((r) => r.username !== user.username);
+    await writeJson("accounts.json", data);
+    res.json({ ok: true });
+  });
+
   app.post("/api/auth/role", requireAdmin, async (req, res) => {
     const id = String((req.body && req.body.userId) || "");
     const role = (req.body && req.body.role) === "admin" ? "admin" : "team";

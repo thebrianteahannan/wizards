@@ -103,7 +103,7 @@ function renderPitching(roster, stats, customIds) {
         <span class="num">${i + 1}</span>
         <span class="num" title="Pitch rating">${grade}</span>
         <strong>${escapeHtml(p.name)}</strong>
-        <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${pitchLine(row)}</div>
+        <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.72rem">${pitchLine(row)}</div>
         ${move}
       </div>`;
     })

@@ -1,207 +1,244 @@
 {
+  "fee": "$250 per team for the year",
   "team": "The Wizards of Wiff",
-  "shortName": "Wizards",
   "league": "Florida Challengers League",
   "season": "Fall 2026",
-  "location": "Brooksville, FL",
-  "homeArea": "Bradenton / Tampa Bay",
-  "fee": "$250 per team for the year",
-  "coManagers": [
-    { "id": "tony-kurtanick", "name": "Tony Kurtanick" },
-    { "id": "brian-hannan", "name": "Brian Hannan" }
-  ],
   "players": [
     {
       "id": "tony-kurtanick",
-      "name": "Tony Kurtanick",
-      "number": 8,
-      "positions": ["P"],
-      "born": "7/10/1973",
       "sex": "M",
-      "status": "Active",
+      "born": "7/10/1973",
+      "name": "Tony Kurtanick",
       "role": "Co-manager",
+      "number": 8,
+      "status": "Active",
       "regular": true,
-      "squads": ["league", "tournament"]
+      "positions": [
+        "P",
+        "IF"
+      ]
     },
     {
       "id": "brian-hannan",
-      "name": "Brian Hannan",
-      "number": 23,
-      "positions": ["P", "LF"],
-      "born": "6/23/1984",
       "sex": "M",
-      "status": "Active",
+      "born": "6/23/1984",
+      "name": "Brian Hannan",
       "role": "Co-manager",
+      "limits": "Mondays and Tuesdays; every other weekend (Fri–Sun)",
+      "number": 23,
+      "status": "Active",
       "regular": true,
-      "squads": ["league", "tournament"]
+      "positions": [
+        "2B",
+        "P"
+      ]
     },
     {
       "id": "jose-gonzalez",
-      "name": "Jose Gonzalez",
-      "number": 2,
-      "positions": ["P", "2B", "SS"],
+      "sex": "M",
       "born": "3/4/1972",
-      "sex": "M",
-      "status": "IR",
+      "name": "Jose Gonzalez",
       "role": "Player",
-      "regular": false,
-      "squads": ["league"]
-    },
-    {
-      "id": "jr-cadotte",
-      "name": "Jr Cadotte",
-      "number": null,
-      "positions": ["P"],
-      "born": null,
-      "sex": "M",
+      "number": 2,
       "status": "Active",
-      "role": "Player",
       "regular": true,
-      "squads": ["league"]
+      "positions": [
+        "P",
+        "IF",
+        "OF"
+      ]
     },
     {
       "id": "angel-rodriguez",
-      "name": "Angel Rodriquez",
-      "number": null,
-      "positions": ["2B", "CF"],
-      "born": null,
       "sex": "M",
-      "status": "Active",
+      "born": null,
+      "name": "Angel Rodriquez",
       "role": "Player",
+      "number": null,
+      "status": "Active",
       "regular": true,
-      "squads": ["league"]
+      "positions": [
+        "2B",
+        "CF"
+      ]
     },
     {
       "id": "damian-gilpin",
+      "sex": "M",
+      "born": null,
       "name": "Damian Gilpin",
+      "role": "Player",
       "number": null,
-      "positions": [],
-      "born": null,
-      "sex": "M",
       "status": "Active",
-      "role": "Player",
       "regular": true,
-      "squads": ["league"]
-    },
-    {
-      "id": "ben-zysek",
-      "name": "Ben Zysek",
-      "number": 56,
-      "positions": ["2B", "RF"],
-      "born": null,
-      "sex": "M",
-      "status": "Active",
-      "role": "Player",
-      "regular": true,
-      "squads": ["tournament"]
+      "positions": [
+        "OF"
+      ]
     },
     {
       "id": "cam",
-      "name": "Cam Dupe",
-      "number": null,
-      "positions": ["P", "CF"],
-      "born": null,
       "sex": "M",
-      "status": "Active",
+      "born": null,
+      "name": "Cam Dupe",
       "role": "Player",
+      "number": null,
+      "status": "Active",
       "regular": true,
-      "squads": ["tournament"]
+      "positions": [
+        "P",
+        "CF"
+      ]
     },
     {
-      "id": "jakob-lafirst",
-      "name": "Jakob Lafirst",
-      "number": 17,
-      "positions": ["2B", "P"],
-      "born": null,
+      "id": "nicholas-ramos",
       "sex": "M",
-      "status": "Active",
+      "born": null,
+      "name": "Nicholas Ramos",
       "role": "Player",
+      "limits": "Only available through end of September",
+      "number": 22,
+      "status": "Active",
       "regular": true,
-      "squads": ["tournament"]
+      "positions": [
+        "OF",
+        "P"
+      ]
     },
     {
       "id": "kevin-mccracken",
-      "name": "Kevin McCracken",
-      "number": null,
-      "positions": [],
-      "born": null,
       "sex": "M",
-      "status": "Active",
+      "born": null,
+      "name": "Kevin McCracken",
       "role": "Player",
+      "limits": "Fridays; sometimes Mondays and weekends",
+      "number": null,
+      "status": "Active",
       "regular": true,
-      "squads": ["league"]
+      "positions": [
+        "IF",
+        "P"
+      ]
     },
     {
       "id": "johnny-driscoll",
+      "sex": "M",
+      "born": null,
       "name": "Johnny Driscoll",
+      "role": "Player",
       "number": null,
-      "positions": [],
-      "born": null,
-      "sex": "M",
       "status": "Active",
-      "role": "Player",
       "regular": true,
-      "squads": ["league"]
-    },
-    {
-      "id": "jostheir-aponte",
-      "name": "Jostheir Aponte",
-      "number": 0,
-      "positions": ["Util"],
-      "born": null,
-      "sex": "M",
-      "status": "Inactive",
-      "role": "Player",
-      "regular": false,
-      "squads": ["league"]
-    },
-    {
-      "id": "steven-guiffre",
-      "name": "Steven Guiffre",
-      "number": 32,
-      "positions": ["IF", "2B"],
-      "born": null,
-      "sex": "M",
-      "status": "Inactive",
-      "role": "Player",
-      "regular": false,
-      "squads": ["league"]
+      "positions": [
+        "OF",
+        "Util"
+      ]
     },
     {
       "id": "mike-zaniewski",
-      "name": "Mike Zaniewski",
-      "number": null,
-      "positions": [],
-      "born": null,
       "sex": "M",
-      "status": "Inactive",
+      "born": null,
+      "name": "Mike Zaniewski",
       "role": "Player",
+      "number": null,
+      "status": "Inactive",
       "regular": false,
-      "squads": ["league"]
+      "positions": []
     },
     {
-      "id": "zach-rosian",
-      "name": "Zach Rosian",
-      "number": null,
-      "positions": [],
-      "born": null,
+      "id": "tom-bosquez-jr",
       "sex": "M",
-      "status": "New",
+      "born": null,
+      "name": "Tom Bosquez Jr",
       "role": "Player",
+      "number": null,
+      "status": "New",
       "regular": false,
-      "squads": ["league"]
+      "positions": [
+        "Util"
+      ]
     },
     {
       "id": "louis-whalen",
-      "name": "Louis Whalen",
-      "number": null,
-      "positions": [],
-      "born": null,
       "sex": "M",
-      "status": "New",
+      "born": null,
+      "name": "Louis Whalen",
       "role": "Player",
+      "number": null,
+      "status": "New",
       "regular": false,
-      "squads": ["league"]
+      "positions": []
+    },
+    {
+      "id": "john-hayes",
+      "sex": "M",
+      "born": null,
+      "name": "John Hayes",
+      "role": "Player",
+      "number": 4,
+      "status": "Active",
+      "regular": true,
+      "positions": [
+        "OF",
+        "Util"
+      ]
+    },
+    {
+      "id": "fernando-baez",
+      "sex": "M",
+      "born": null,
+      "name": "Fernando Baez",
+      "role": "Player",
+      "number": 12,
+      "status": "Active",
+      "regular": true,
+      "positions": [
+        "OF",
+        "Util"
+      ]
+    },
+    {
+      "id": "norm-ortega",
+      "sex": "M",
+      "born": null,
+      "name": "Norm Ortega",
+      "role": "Player",
+      "number": 98,
+      "status": "Active",
+      "regular": true,
+      "positions": [
+        "IF"
+      ]
+    },
+    {
+      "id": "elyjah-sayre",
+      "sex": "M",
+      "born": null,
+      "name": "Elyjah Sayre",
+      "role": "Player",
+      "number": 97,
+      "status": "Active",
+      "regular": true,
+      "positions": [
+        "OF"
+      ]
     }
+  ],
+  "homeArea": "Bradenton / Tampa Bay",
+  "location": "Brooksville, FL",
+  "shortName": "Wizards",
+  "coManagers": [
+    {
+      "id": "tony-kurtanick",
+      "name": "Tony Kurtanick"
+    },
+    {
+      "id": "brian-hannan",
+      "name": "Brian Hannan"
+    }
+  ],
+  "pitchingOrder": [
+    "tony-kurtanick",
+    "brian-hannan",
+    "nicholas-ramos"
   ]
 }

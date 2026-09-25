@@ -125,22 +125,38 @@ function recruitClub(r, book) {
   return null;
 }
 
-function renderRecruits(data, openId, book) {
-  const takenN = (data.recruits || []).filter((r) => recruitClub(r, book)).length;
-  const rows = (data.recruits || [])
+function recruitInbox(data) {
+  return (data.recruits || []).filter((r) => !r.archivedAt);
+}
+
+function recruitArchive(data) {
+  return (data.recruits || []).filter((r) => r.archivedAt);
+}
+
+function renderRecruits(data, openId, book, view) {
+  view = view === "archive" ? "archive" : "inbox";
+  const archived = view === "archive";
+  const inbox = recruitInbox(data);
+  const stored = recruitArchive(data);
+  const list = archived ? stored : inbox;
+  const takenN = list.filter((r) => recruitClub(r, book)).length;
+  const rows = list
     .map((r) => {
       const when = r.createdAt ? fmtDate(r.createdAt.slice(0, 10)) : "";
       const pos = r.secondary ? `${escapeHtml(r.primary)} / ${escapeHtml(r.secondary)}` : escapeHtml(r.primary);
       const bits = [r.phone || "No phone", r.email, r.experience, r.notes].filter(Boolean).map((b) => escapeHtml(b));
       const open = openId === r.id;
       const taken = recruitClub(r, book);
+      const move = archived
+        ? `<a href="#/recruits" class="recruit-unarchive" data-id="${attr(r.id)}">Restore</a>`
+        : `<a href="#/recruits" class="recruit-archive" data-id="${attr(r.id)}">Archive</a>`;
       return `
-      <article class="event"${taken ? ' style="opacity:0.88"' : ""}>
+      <article class="event"${taken || archived ? ' style="opacity:0.88"' : ""}>
         <time>#${escapeHtml(r.number)}</time>
         <div>
-          <div class="kind">${when}${pos ? " · " + pos : ""}${taken ? ` · <span style="color:#fb7185">On ${escapeHtml(taken.name)}</span>` : ""}</div>
+          <div class="kind">${when}${pos ? " · " + pos : ""}${taken ? ` · <span style="color:#fb7185">On ${escapeHtml(taken.name)}</span>` : ""}${archived ? " · Archived" : ""}</div>
           <h3>${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)}${taken ? ` <span class="tag" style="color:#fb7185">Taken</span>` : ""}</h3>
-          <p>${bits.join(" · ")} · <a href="#/recruits" class="recruit-edit" data-id="${attr(r.id)}">${open ? "Close" : "Edit"}</a></p>
+          <p>${bits.join(" · ")} · <a href="#/recruits" class="recruit-edit" data-id="${attr(r.id)}">${open ? "Close" : "Edit"}</a> · ${move} · <a href="#/recruits" class="recruit-del" data-id="${attr(r.id)}">Delete</a></p>
           ${open ? `
           <form class="recruit-form" data-id="${attr(r.id)}">
             ${recruitCoreFields(r, { phoneRequired: false })}
@@ -153,7 +169,7 @@ function renderRecruits(data, openId, book) {
             </div>
             <p class="muted recruit-msg"></p>
           </form>` : ""}
-          ${recruitActions(r)}
+          ${archived ? "" : recruitActions(r)}
         </div>
       </article>`;
     })
@@ -161,16 +177,25 @@ function renderRecruits(data, openId, book) {
   return `
     <p class="kicker">Team only</p>
     <h1>Recruits</h1>
-    <p class="lede">People who joined or that a Wizard recruited. Add phone, email, or notes whenever you get them. ${isAdmin() ? "After you contact someone, you can move them onto the roster." : ""} ${data.recruits && data.recruits.length ? data.recruits.length + " on the list." : "Nobody yet."}${takenN ? " " + takenN + (takenN === 1 ? " already on another club." : " already on other clubs.") : ""}</p>
-    <div class="timeline" style="margin-top:1rem">${rows || '<p class="muted">The inbox is empty.</p>'}</div>
+    <p class="lede">People who joined or that a Wizard recruited. Archive keeps them for later outreach without cluttering the inbox. ${isAdmin() ? "After you contact someone, you can move them onto the roster." : ""} ${inbox.length ? inbox.length + " in the inbox." : "Inbox is empty."}${stored.length ? " " + stored.length + " archived." : ""}${takenN ? " " + takenN + (takenN === 1 ? " already on another club." : " already on other clubs.") : ""}</p>
+    <div class="actions" style="margin-top:0.7rem">
+      <a class="btn ghost${archived ? "" : " on"}" href="#/recruits" data-recruit-view="inbox">Inbox${inbox.length ? " · " + inbox.length : ""}</a>
+      <a class="btn ghost${archived ? " on" : ""}" href="#/recruits" data-recruit-view="archive">Archive${stored.length ? " · " + stored.length : ""}</a>
+    </div>
+    <div class="timeline" style="margin-top:1rem">${rows || `<p class="muted">${archived ? "Archive is empty." : "The inbox is empty."}</p>`}</div>
   `;
 }
 
 function bindJoin() {
   const form = document.getElementById("join-form");
-  if (!form) return;
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = "1";
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (form.dataset.busy) return;
+    form.dataset.busy = "1";
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
     const msg = document.getElementById("join-msg");
     const body = Object.fromEntries(new FormData(form).entries());
     try {
@@ -180,17 +205,64 @@ function bindJoin() {
     } catch (err) {
       msg.textContent = err.message;
     }
+    form.dataset.busy = "";
+    if (btn) btn.disabled = false;
   });
 }
 
-function bindRecruits(data, book) {
+function bindRecruits(data, book, view) {
+  view = view === "archive" ? "archive" : "inbox";
+  const paint = (next, openId) => {
+    document.getElementById("app").innerHTML = renderRecruits(next, openId || "", book, view);
+    bindRecruits(next, book, view);
+  };
+  document.querySelectorAll("[data-recruit-view]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      view = btn.dataset.recruitView === "archive" ? "archive" : "inbox";
+      paint(data);
+    });
+  });
   document.querySelectorAll(".recruit-edit").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       const id = btn.dataset.id;
       const closing = document.querySelector(`.recruit-form[data-id="${id}"]`);
-      document.getElementById("app").innerHTML = renderRecruits(data, closing ? "" : id, book);
-      bindRecruits(data, book);
+      paint(data, closing ? "" : id);
+    });
+  });
+  document.querySelectorAll(".recruit-archive").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        paint(await api.send("/api/recruits/" + btn.dataset.id + "/archive", "POST", {}));
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+  document.querySelectorAll(".recruit-unarchive").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        paint(await api.send("/api/recruits/" + btn.dataset.id + "/unarchive", "POST", {}));
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+  document.querySelectorAll(".recruit-del").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const id = btn.dataset.id;
+      const r = (data.recruits || []).find((x) => x.id === id);
+      const name = r ? (r.firstName + " " + r.lastName).trim() : "this recruit";
+      if (!confirm("Delete " + name + " from recruits?")) return;
+      try {
+        paint(await api.send("/api/recruits/" + id, "DELETE"));
+      } catch (err) {
+        alert(err.message);
+      }
     });
   });
   document.querySelectorAll(".recruit-form").forEach((form) => {
@@ -199,9 +271,7 @@ function bindRecruits(data, book) {
       const msg = form.querySelector(".recruit-msg");
       const body = Object.fromEntries(new FormData(form).entries());
       try {
-        const next = await api.send("/api/recruits/" + form.dataset.id, "PUT", body);
-        document.getElementById("app").innerHTML = renderRecruits(next, "", book);
-        bindRecruits(next, book);
+        paint(await api.send("/api/recruits/" + form.dataset.id, "PUT", body));
       } catch (err) {
         if (msg) msg.textContent = err.message;
       }
@@ -213,9 +283,7 @@ function bindRecruits(data, book) {
     const card = btn.closest("article");
     const msg = card && card.querySelector(".recruit-action-msg");
     try {
-      const next = await api.send(path, "POST", {});
-      document.getElementById("app").innerHTML = renderRecruits(next, "", book);
-      bindRecruits(next, book);
+      paint(await api.send(path, "POST", {}));
     } catch (err) {
       btn.disabled = false;
       if (msg) msg.textContent = err.message;

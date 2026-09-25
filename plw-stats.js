@@ -9,8 +9,15 @@ const PITCHER_URL =
   "https://www.mystatsonline.com/ballsports/visitor/league/stats/pitcher.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
 const CELL_KEYS = ["g", "avg", "slg", "obp", "ab", "r", "h", "singles", "doubles", "triples", "hr", "rbi", "tb", "so", "bb", "sf", "tpa", "roe", "ops", "fc"];
 const PITCH_KEYS = ["g", "w", "l", "sv", "era", "ip", "h", "r", "er", "bb", "so", "hr", "bf", "gs", "cg", "sho", "avg", "whip", "sox", "bbx"];
+const NAME_ALIASES = [{ last: "Nicolson", first: "Shaun", asLast: "Nicholson", asFirst: "Shaun" }];
 
 let cache = { at: 0, data: null };
+
+function aliasFor(last, first) {
+  const L = String(last || "").toLowerCase();
+  const F = String(first || "").toLowerCase();
+  return NAME_ALIASES.find((a) => a.last.toLowerCase() === L && a.first.toLowerCase() === F) || null;
+}
 
 function nameParts(full) {
   const bits = String(full || "")
@@ -21,6 +28,11 @@ function nameParts(full) {
 }
 
 function matchPlayer(players, last, first) {
+  const alias = aliasFor(last, first);
+  if (alias) {
+    last = alias.asLast;
+    first = alias.asFirst;
+  }
   const L = String(last || "").toLowerCase();
   const F = String(first || "").toLowerCase();
   let hit = players.find((p) => {
@@ -43,13 +55,18 @@ function matchPlayer(players, last, first) {
 function parseRows(html, keys) {
   const rows = [];
   for (const chunk of String(html || "").split("<tr>")) {
-    if (!chunk.includes('teams_name_col text-center">WIZ<')) continue;
+    const teamHit = chunk.match(/teams_name_col text-center">([^<]+)</);
+    if (!teamHit) continue;
+    const team = String(teamHit[1] || "")
+      .replace(/&nbsp;/gi, "")
+      .trim();
     const named = chunk.match(/<span id='([^']+)'>/);
     if (!named) continue;
     const [last, first] = named[1].split(",").map((s) => s.trim());
+    if (team !== "WIZ" && !aliasFor(last, first)) continue;
     const cells = [...chunk.matchAll(/<td class=" text-center">([^<]*)<\/td>/g)].map((m) => m[1]).filter(Boolean);
     if (!cells[1]) continue;
-    const row = { last, first };
+    const row = { last, first, team };
     keys.forEach((key, i) => {
       if (cells[i] != null) row[key] = cells[i];
     });
@@ -69,12 +86,16 @@ async function fetchTable(base, seasonId, keys) {
 }
 
 function attachIds(rows, players) {
-  return rows
-    .map((row) => {
-      const p = matchPlayer(players, row.last, row.first);
-      return p ? { ...row, playerId: p.id, name: p.name } : null;
-    })
-    .filter(Boolean);
+  const ranked = [...rows].sort((a, b) => Number(b.team === "WIZ") - Number(a.team === "WIZ"));
+  const seen = new Set();
+  const out = [];
+  for (const row of ranked) {
+    const p = matchPlayer(players, row.last, row.first);
+    if (!p || seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push({ ...row, playerId: p.id, name: p.name });
+  }
+  return out;
 }
 
 function mergeKind(leagueRows, tourneyRows, players) {

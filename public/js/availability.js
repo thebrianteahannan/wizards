@@ -1,17 +1,17 @@
 const AVAIL_META = {
   league: {
     kind: "league",
-    title: "League",
-    lede: "Open nights and Wizards games from the MyStatsOnline calendar. Green at NEED yes.",
-    from: "From MyStatsOnline",
+    title: "Match days",
+    lede: "Open nights, Wizards games, and upcoming tournaments. Green at NEED yes.",
+    from: "From the PLW calendar",
     board: "Nights on the board",
   },
   tournament: {
     kind: "tournament",
-    title: "Tournament days",
-    lede: "Who can play each tournament. Green at NEED yes.",
-    from: "On the calendar",
-    board: "Tournament dates",
+    title: "Match days",
+    lede: "Open nights, Wizards games, and upcoming tournaments. Green at NEED yes.",
+    from: "From the PLW calendar",
+    board: "Nights on the board",
   },
   practice: {
     kind: "practice",
@@ -28,6 +28,75 @@ function availPage(kind) {
 
 function availApi(kind) {
   return "/api/availability?kind=" + encodeURIComponent(kind);
+}
+
+function todayStamp() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function mergeMatchAvail(league, tourney) {
+  const today = todayStamp();
+  const players = {};
+  const sit = {};
+  const order = {};
+  for (const src of [tourney || {}, league || {}]) {
+    for (const [id, p] of Object.entries(src.players || {})) {
+      players[id] = {
+        name: p.name,
+        updatedAt: p.updatedAt,
+        days: { ...((players[id] || {}).days || {}), ...(p.days || {}) },
+      };
+    }
+    Object.assign(sit, src.sit || {});
+    Object.assign(order, src.order || {});
+  }
+  const byDate = new Map();
+  for (const [src, kind] of [
+    [league, "league"],
+    [tourney, "tournament"],
+  ]) {
+    for (const o of (src && src.offers) || []) {
+      if (o.date && o.date < today) continue;
+      byDate.set(o.date || o.day, { ...o, source: kind });
+    }
+  }
+  const locked = (league && league.lockedNight) || (tourney && tourney.lockedNight);
+  return {
+    needed: (league && league.needed) || (tourney && tourney.needed) || 6,
+    windows: (league && league.windows) || (tourney && tourney.windows) || [],
+    days: (league && league.days) || [],
+    players,
+    sit,
+    order,
+    lockedNight: locked ? { ...locked, source: league && league.lockedNight ? "league" : "tournament" } : null,
+    offers: [...byDate.values()].sort((a, b) => String(a.date || a.day).localeCompare(String(b.date || b.day))),
+  };
+}
+
+async function loadMatchAvail(kind) {
+  if (kind === "league" || kind === "tournament") {
+    const [a, b] = await Promise.all([api.get(availApi("league")), api.get(availApi("tournament"))]);
+    return mergeMatchAvail(a, b);
+  }
+  return api.get(availApi(kind));
+}
+
+function applyAvailSave(avail, saved) {
+  if (!avail || !saved) return;
+  if (saved.players) {
+    for (const [id, p] of Object.entries(saved.players)) {
+      const cur = avail.players[id] || { name: p.name, days: {} };
+      avail.players[id] = {
+        ...cur,
+        name: p.name || cur.name,
+        updatedAt: p.updatedAt || cur.updatedAt,
+        days: { ...(cur.days || {}), ...(p.days || {}) },
+      };
+    }
+  }
+  if (saved.sit) avail.sit = { ...(avail.sit || {}), ...saved.sit };
+  if (saved.order) avail.order = { ...(avail.order || {}), ...saved.order };
 }
 
 function offerKey(offer, kind) {
@@ -57,12 +126,11 @@ function windowsForOffer(offer, fallback) {
 }
 
 function adminRestChips(roster, avail, day, kind) {
-  const book = kind === "league" || kind === "tournament" ? kind : "";
   const tags = (roster.players || [])
     .filter((p) => {
       if (!isActive(p)) return false;
       const st = ((((avail.players || {})[p.id] || {}).days || {})[day] || {}).status;
-      return st !== "yes" && st !== "maybe" && (!book || typeof onSquad !== "function" || onSquad(p, book));
+      return st !== "yes" && st !== "maybe";
     })
     .map((p) => `<span class="chip" data-admin-sign="${escapeHtml(p.id)}" style="opacity:0.4;cursor:pointer">${escapeHtml(p.name)}</span>`)
     .join("");
@@ -89,16 +157,17 @@ function lockLabel(day) {
 }
 
 function availTabs(kind) {
+  const matchOn = kind === "league" || kind === "tournament";
   return `
     <div class="actions" style="margin-top:0">
-      <a class="btn ghost${kind === "league" ? " on" : ""}" href="#/availability">League</a>
-      <a class="btn ghost${kind === "tournament" ? " on" : ""}" href="#/tournament">Tournament</a>
+      <a class="btn ghost${matchOn ? " on" : ""}" href="#/availability">Match days</a>
       <a class="btn ghost${kind === "practice" ? " on" : ""}" href="#/practice">Practice</a>
     </div>
     <p style="margin:0.45rem 0 1rem"><a href="#/activity">Activity log</a></p>`;
 }
 
 async function renderAvailability(roster, avail, playerId, kind) {
+  availDaysOpen = false;
   const page = availPage(kind);
   const savedId = playerId || "";
   const mine = (savedId && avail.players[savedId] && avail.players[savedId].days) || {};
@@ -106,12 +175,9 @@ async function renderAvailability(roster, avail, playerId, kind) {
   const isManager = isAdmin() || (roster.players.find((p) => p.id === savedId) || {}).role === "Co-manager";
   const needed = avail.needed || 6;
 
-  const today = (() => {
-    const d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-  })();
+  const today = todayStamp();
   const offers = [...(avail.offers || [])]
-    .filter((o) => page.kind !== "league" || !o.date || o.date >= today)
+    .filter((o) => page.kind === "practice" || !o.date || o.date >= today)
     .sort((a, b) => String(a.date || a.day).localeCompare(String(b.date || b.day)));
   let book = [];
   if (page.kind === "league") {
@@ -147,17 +213,18 @@ async function renderAvailability(roster, avail, playerId, kind) {
     const wins = dayWindows
       .map((w) => `<label><input type="checkbox" name="w-${day}" value="${w.id}" ${entry.windows.includes(w.id) ? "checked" : ""}/> ${escapeHtml(w.hint)}</label>`)
       .join("");
+    const src = offer.source || page.kind;
     const lockBtn =
       isManager && go
-        ? `<button class="btn" data-lock="${day}" data-window="${best.w.id}" type="button">Lock</button>`
+        ? `<button class="btn" data-lock="${day}" data-window="${best.w.id}" data-kind="${escapeHtml(src)}" type="button">Lock</button>`
         : "";
-    const fav = page.kind === "league" && typeof matchupFavor === "function" ? matchupFavor(offer, book) : null;
+    const fav = src !== "practice" && typeof matchupFavor === "function" ? matchupFavor(offer, book) : null;
     const favHtml =
       fav == null
         ? ""
         : `<span class="num" title="Matchup difficulty — higher is harder" style="margin-left:auto;letter-spacing:0;text-align:right;line-height:1.05"><small style="display:block;font-size:0.55rem;font-family:var(--sans,inherit);${typeof favorTone === "function" ? favorTone(fav) : ""}">${typeof favorWord === "function" ? escapeHtml(favorWord(fav)) : ""}</small><b style="font-family:var(--display);font-size:1.15rem;${typeof favorTone === "function" ? favorTone(fav) : ""}">${fav}</b></span>`;
     return `
-      <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}" style="cursor:pointer">
+      <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}" data-kind="${escapeHtml(src)}" style="cursor:pointer">
         <h3>${num ? `<span class="day-num" style="font-family:var(--sport);letter-spacing:0.06em">${escapeHtml(mon)} ${num}</span>` : ""}${label}${favHtml}</h3>
         <p class="day-note">${escapeHtml(offer.note)}</p>
         <div class="win-line">${counts}</div>
@@ -203,21 +270,12 @@ async function renderAvailability(roster, avail, playerId, kind) {
         <p id="practice-add-msg" class="muted"></p>
       </form>
     </section>` : ""}
-    ${offers.length ? `<section class="card adam-offers">
-      <p class="kicker">${escapeHtml(page.from)}</p>
-      <h2>${escapeHtml(page.board)}</h2>
-      <ul class="rules">${offers.map((o) => {
-        const d = new Date((o.date || "") + "T12:00:00");
-        const label = Number.isNaN(d.getTime())
-          ? cap(o.day)
-          : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-        return `<li><strong>${Number.isNaN(d.getTime()) ? "" : d.getDate()}</strong> ${escapeHtml(label)} — ${escapeHtml(o.note)}</li>`;
-      }).join("")}</ul>
-    </section>` : page.kind === "practice" ? "" : `<p class="muted">No dates on the board yet.</p>`}
-    ${locked ? `<div class="banner">Locked: <strong>${escapeHtml(lockLabel(locked.day))} ${escapeHtml(locked.window)}</strong> by ${escapeHtml(locked.lockedBy)}. ${isManager ? '<button class="btn ghost" id="clear-lock" type="button">Clear lock</button>' : ""}</div>` : ""}
+    ${!offers.length && page.kind !== "practice" ? `<p class="muted">No dates on the board yet.</p>` : ""}
+    ${locked ? `<div class="banner">Locked: <strong>${escapeHtml(lockLabel(locked.day))} ${escapeHtml(locked.window)}</strong> by ${escapeHtml(locked.lockedBy)}. ${isManager ? `<button class="btn ghost" id="clear-lock" data-kind="${escapeHtml(locked.source || page.kind)}" type="button">Clear lock</button>` : ""}</div>` : ""}
     <form id="avail-form">
       <p id="avail-msg" class="muted">Tap a date card to see that night's diamond. Radios still save your answer.</p>
       <div class="day-grid">${dayCols}</div>
+      ${offers.length > 1 ? `<p style="margin:0.55rem 0 0"><button class="btn ghost" type="button" id="avail-more">Show more days</button></p>` : ""}
     </form>
     ${renderEmptyNightDiamond()}
   `;
@@ -287,13 +345,7 @@ function paintLiveDay(card, avail, roster) {
 }
 
 function firstWindowOffer(avail) {
-  const d = new Date();
-  const today =
-    d.getFullYear() +
-    "-" +
-    String(d.getMonth() + 1).padStart(2, "0") +
-    "-" +
-    String(d.getDate()).padStart(2, "0");
+  const today = todayStamp();
   return [...(avail.offers || [])]
     .filter((o) => o.date && o.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
@@ -347,10 +399,10 @@ function askFirstWindow(playerId, offer, avail, kind, onDone) {
     if (msg) msg.textContent = "Saving…";
     try {
       const saved = await api.send("/api/availability/" + playerId, "PUT", {
-        kind,
+        kind: (offer && offer.source) || kind,
         days: { [day]: { status, windows: status === "no" ? [] : windows } },
       });
-      if (avail && saved && saved.players) avail.players = saved.players;
+      applyAvailSave(avail, saved);
       wrap.remove();
       onDone(offer.date);
     } catch (err) {
@@ -360,24 +412,65 @@ function askFirstWindow(playerId, offer, avail, kind, onDone) {
   });
 }
 
+let availDaysOpen = false;
+
+function layoutDayCards() {
+  const grid = document.querySelector("#avail-form .day-grid");
+  const more = document.getElementById("avail-more");
+  if (!grid) return;
+  const cards = [...grid.querySelectorAll("article.day")];
+  cards.forEach((c) => {
+    c.hidden = false;
+  });
+  if (cards.length < 2) {
+    if (more) more.hidden = true;
+    return;
+  }
+  if (availDaysOpen) {
+    if (more) {
+      more.hidden = false;
+      more.textContent = "Show fewer days";
+    }
+    return;
+  }
+  const top = cards[0].offsetTop;
+  const hide = cards.filter((c) => c.offsetTop > top + 4);
+  hide.forEach((c) => {
+    c.hidden = true;
+  });
+  const extra = hide.length;
+  const date = new URLSearchParams((location.hash.split("?")[1] || "")).get("date");
+  const focus = date && cards.find((c) => c.dataset.date === date);
+  if (focus && focus.hidden) {
+    availDaysOpen = true;
+    layoutDayCards();
+    return;
+  }
+  if (more) {
+    more.hidden = !extra;
+    more.textContent = "Show more days";
+  }
+}
+
 function bindAvailability(roster, skipAsk, kind, avail) {
   const page = availPage(kind);
   const form = document.getElementById("avail-form");
   if (!form) return;
   const me = sessionPlayerId(roster.players);
   const redraw = async (id, skip, focusDate) => {
-    const [r, a] = await Promise.all([api.get("/api/roster"), api.get(availApi(page.kind))]);
-    document.getElementById("app").innerHTML = await renderAvailability(r, a, id, page.kind);
-    bindAvailability(r, skip, page.kind, a);
+    const [r, a] = await Promise.all([api.get("/api/roster"), loadMatchAvail(page.kind)]);
+    document.getElementById("app").innerHTML = await renderAvailability(r, a, id, page.kind === "tournament" ? "league" : page.kind);
+    bindAvailability(r, skip, page.kind === "tournament" ? "league" : page.kind, a);
     const card = focusDate && document.querySelector(`article.day[data-date="${focusDate}"]`);
     if (card) {
       const offer = (a.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
-      if (offer) paintAvailDiamond(card, r, a, page.kind, offer, false);
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (offer) paintAvailDiamond(card, r, a, offer.source || card.dataset.kind || page.kind, offer, false);
+      const dia = document.getElementById("avail-diamond");
+      if (dia) dia.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   };
   const promptFirst = (id, after) => {
-    const first = page.kind === "league" ? firstWindowOffer(avail || {}) : null;
+    const first = page.kind === "practice" ? null : firstWindowOffer(avail || {});
     const day = first && offerKey(first, page.kind);
     const answered = day && ((((avail || {}).players || {})[id] || {}).days || {})[day];
     if (first && !answered) askFirstWindow(id, first, avail, page.kind, (focusDate) => redraw(id, true, focusDate));
@@ -403,15 +496,15 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     }
     const n = ++saveN;
     if (msg) msg.textContent = "Saving…";
-    api.send("/api/availability/" + playerId, "PUT", { days: { [day]: { status, windows } }, kind: page.kind })
+    api.send("/api/availability/" + playerId, "PUT", { days: { [day]: { status, windows } }, kind: card.dataset.kind || page.kind })
       .then((next) => {
         if (n !== saveN) return;
-        if (next && next.players) avail.players = next.players;
+        applyAvailSave(avail, next);
         if (msg) msg.textContent = "Saved.";
         const open = document.getElementById("avail-diamond");
         if (open && open.dataset.day === day) {
           const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === day);
-          if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, false);
+          if (offer) paintAvailDiamond(card, roster, avail, offer.source || card.dataset.kind || page.kind, offer, false);
         }
       })
       .catch((err) => {
@@ -427,7 +520,7 @@ function bindAvailability(roster, skipAsk, kind, avail) {
       const on = !!act.dataset.adminSign;
       const id = act.dataset.adminSign || act.dataset.adminDrop;
       const windows = on ? [...card.querySelectorAll(`input[name="w-${day}"]`)].map((i) => i.value) : [];
-      api.send("/api/availability/" + id, "PUT", { days: { [day]: { status: on ? "yes" : "no", windows } }, kind: page.kind })
+      api.send("/api/availability/" + id, "PUT", { days: { [day]: { status: on ? "yes" : "no", windows } }, kind: card.dataset.kind || page.kind })
         .then(() => redraw(sessionPlayerId(roster.players), true, card.dataset.date))
         .catch((err) => alert(err.message));
       return;
@@ -443,7 +536,7 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     const card = e.target.closest("article.day");
     if (!card) return;
     const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
-    if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, true);
+    if (offer) paintAvailDiamond(card, roster, avail, offer.source || card.dataset.kind || page.kind, offer, true);
   });
   form.addEventListener("submit", (e) => e.preventDefault());
   const add = document.getElementById("practice-add");
@@ -464,13 +557,13 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   document.querySelectorAll("[data-lock]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
-        const avail = await api.send("/api/lock-night", "POST", {
-          kind: page.kind,
+        const next = await api.send("/api/lock-night", "POST", {
+          kind: btn.dataset.kind || page.kind,
           day: btn.dataset.lock,
           window: btn.dataset.window,
         });
-        document.getElementById("app").innerHTML = await renderAvailability(roster, avail, sessionPlayerId(roster.players), page.kind);
-        bindAvailability(roster, true, page.kind, avail);
+        applyAvailSave(avail, next);
+        await redraw(sessionPlayerId(roster.players), true, btn.closest("article.day") && btn.closest("article.day").dataset.date);
       } catch (err) {
         alert(err.message);
       }
@@ -479,9 +572,8 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   const clear = document.getElementById("clear-lock");
   if (clear) {
     clear.addEventListener("click", async () => {
-      const avail = await api.send("/api/lock-night", "POST", { kind: page.kind, clear: true });
-      document.getElementById("app").innerHTML = await renderAvailability(roster, avail, sessionPlayerId(roster.players), page.kind);
-      bindAvailability(roster, true, page.kind, avail);
+      await api.send("/api/lock-night", "POST", { kind: clear.dataset.kind || page.kind, clear: true });
+      await redraw(sessionPlayerId(roster.players), true);
     });
   }
   const date = new URLSearchParams((location.hash.split("?")[1] || "")).get("date");
@@ -490,9 +582,21 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     || (next && document.querySelector(`article.day[data-date="${next.date}"]`));
   if (card) {
     const offer = (avail.offers || []).find((o) => offerKey(o, page.kind) === card.dataset.day);
-    if (offer) paintAvailDiamond(card, roster, avail, page.kind, offer, false);
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (offer) paintAvailDiamond(card, roster, avail, offer.source || card.dataset.kind || page.kind, offer, false);
   }
+  const more = document.getElementById("avail-more");
+  if (more) {
+    more.addEventListener("click", () => {
+      availDaysOpen = !availDaysOpen;
+      layoutDayCards();
+    });
+  }
+  layoutDayCards();
+}
+
+if (!window.__availDaysResize) {
+  window.__availDaysResize = true;
+  window.addEventListener("resize", () => layoutDayCards());
 }
 
 function renderActivity(log) {
@@ -517,7 +621,7 @@ function renderActivity(log) {
   return `
     <p class="kicker">Team only</p>
     <h1>Activity log</h1>
-    <p class="lede">Every League, Tournament, and Practice save. Newest first. This lives in data/ with the rest of the live files.</p>
+    <p class="lede">Every Match days and Practice save. Newest first. This lives in data/ with the rest of the live files.</p>
     ${availTabs("activity")}
     <div class="timeline">${rows || '<p class="muted">No saves logged yet. Once someone hits Save, it shows up here.</p>'}</div>
   `;

@@ -18,6 +18,7 @@ function attachRecruitActions(app, { readJson, writeJson, requireAdmin, position
     const i = data.recruits.findIndex((x) => x.id === req.params.id);
     if (i < 0) return res.status(404).json({ error: "Unknown recruit" });
     const r = data.recruits[i];
+    if (r.archivedAt) return res.status(400).json({ error: "Restore them from the archive first" });
     if (!r.contactedAt) return res.status(400).json({ error: "Mark them contacted first" });
     const roster = await readJson("roster.json");
     const name = (r.firstName + " " + r.lastName).replace(/\s+/g, " ").trim();
@@ -41,7 +42,6 @@ function attachRecruitActions(app, { readJson, writeJson, requireAdmin, position
       status: "Active",
       role: "Player",
       regular: true,
-      squads: ["league"],
     });
     if (r.phone || r.email) {
       const contacts = await readJson("contacts.json");

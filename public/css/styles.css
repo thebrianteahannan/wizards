@@ -307,6 +307,31 @@ a.hud:hover { border-color: var(--cyan); }
 .roster-row .num { text-align: center; font-variant-numeric: tabular-nums; }
 .roster-row .tag { margin-right: 0; justify-self: start; }
 .roster-row .muted { text-align: right; }
+.roster-who {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.roster-who strong { flex: 0 1 auto; }
+.roster-limits {
+  flex: 1 1 3.5rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left !important;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.62rem;
+  font-weight: 400;
+  line-height: 1.2;
+}
+button.roster-limits { cursor: pointer; }
 .diamond-card { padding: 0.9rem; }
 .diamond { position: relative; width: 100%; aspect-ratio: 1; max-height: 420px; }
 .diamond-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -485,6 +510,7 @@ a.card { color: inherit; }
 }
 .cal-cell.mute { opacity: 0.25; }
 .cal-cell.has { border-color: var(--cyan); box-shadow: var(--glow); }
+.cal-cell.offer { border-color: rgba(52, 245, 160, 0.45); }
 .cal-n { display: block; font-size: 0.75rem; color: var(--muted); }
 .cal-pill {
   display: block; margin-top: 0.2rem; font-size: 0.68rem; line-height: 1.2;
@@ -494,7 +520,15 @@ a.card { color: inherit; }
 }
 a.cal-pill:hover { filter: brightness(1.2); }
 .cal-pill.tournament { background: rgba(34, 211, 238, 0.22); }
-.cal-pill.played { opacity: 0.65; }
+.cal-pill.open { background: rgba(52, 245, 160, 0.16); }
+.cal-pill.open.go, .cal-pill.go { background: rgba(52, 245, 160, 0.32); }
+.cal-pill.played { opacity: 1; }
+.cal-pill.played.win { background: rgba(52, 245, 160, 0.22); }
+.cal-pill.played.loss { background: rgba(251, 113, 133, 0.22); }
+.cal-pill.played.tie { background: rgba(240, 193, 75, 0.2); }
+.cal-result.win { color: var(--go); }
+.cal-result.loss { color: #fb7185; }
+.cal-result.tie { color: var(--gold); }
 .reveal { opacity: 0; transform: translateY(18px); animation: rise 0.7s ease forwards; }
 .reveal:nth-child(2) { animation-delay: 0.08s; }
 .reveal:nth-child(3) { animation-delay: 0.16s; }
