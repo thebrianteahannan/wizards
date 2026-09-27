@@ -125,6 +125,19 @@ function batterLine(hit) {
   return BAT_LINE.map(([key, label]) => `${label} ${escapeHtml(hit[key] == null || hit[key] === "" ? "—" : String(hit[key]))}`).join(" · ");
 }
 
+function splitStatLines(hit, empty, lineOf) {
+  if (!hit) return `<span class="muted">${empty}</span>`;
+  const row = (label, data) => {
+    const body = data ? lineOf(data) : `<span class="muted">—</span>`;
+    return `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="display:inline-block;width:3.7rem;color:var(--cyan);font-size:0.62rem;letter-spacing:0.06em">${label}</span> ${body}</div>`;
+  };
+  return `<div style="min-width:0">${row("League", hit.league)}${row("Tourney", hit.tourney)}${row("Total", hit)}</div>`;
+}
+
+function batterBlock(hit) {
+  return splitStatLines(hit, "No PLW line yet", batterLine);
+}
+
 function renderOffense(roster, stats, customIds, mode) {
   const lineup = mode === "lineup";
   const admin = lineup && isAdmin();
@@ -136,12 +149,12 @@ function renderOffense(roster, stats, customIds, mode) {
       const move = admin
         ? `<span><button type="button" class="btn ghost" data-bat-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-bat-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
-      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(score)}">${score}${/tourney/i.test(String((hit && hit.source) || "")) ? "*" : ""}</b>`;
-      return `<div class="roster-row" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:center">
+      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(score)}">${score}</b>`;
+      return `<div class="roster-row" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
         <span class="num">${i + 1}</span>
         <span class="num" title="Hit rating">${grade}</span>
         <strong>${escapeHtml(p.name)}</strong>
-        <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${batterLine(hit)}</div>
+        <div class="muted" style="font-size:0.72rem;line-height:1.35">${batterBlock(hit)}</div>
         ${move}
       </div>`;
     })
@@ -154,7 +167,7 @@ function renderOffense(roster, stats, customIds, mode) {
     <div id="offense-card" class="diamond-card card" style="margin-top:1rem">
       <p class="kicker">Offense</p>
       <h2 style="margin:0 0 0.35rem">${lineup ? "Batting order" : "Hitting"}</h2>
-      <p class="muted">${escapeHtml((stats && stats.note) || "Averages from PLW.")} ${blurb} <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+      <p class="muted">${escapeHtml((stats && stats.note) || "League, tourney, and combined averages from PLW.")} ${blurb} Hit rating uses the combined line. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
       <div class="roster-list" style="margin-top:0.6rem">${rows}</div>
       ${admin ? '<p class="muted" id="bat-msg" style="margin:0.45rem 0 0">↑ ↓ saves the order.</p>' : ""}
     </div>`;

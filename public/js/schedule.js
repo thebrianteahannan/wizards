@@ -5,9 +5,31 @@ function eventKind(e) {
   return "league";
 }
 
+function schedToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function matchPack(packs) {
+  if (typeof mergeMatchAvail === "function") {
+    return mergeMatchAvail((packs && packs.league) || {}, (packs && packs.tournament) || {});
+  }
+  return (packs && packs.league) || {};
+}
+
+function offerOnDate(date, packs) {
+  return (matchPack(packs).offers || []).find((o) => o && o.date === date);
+}
+
+function isAvailNight(e, packs, today) {
+  if (!e || !e.date || e.date < today || e.status === "played" || eventKind(e) === "practice") return false;
+  if (e.status === "open" || e.kind === "open") return true;
+  return !!offerOnDate(e.date, packs);
+}
+
 function eventHeadcount(e, packs) {
   const kind = eventKind(e);
-  const avail = (packs && packs[kind]) || {};
+  const avail = kind === "practice" ? (packs && packs.practice) || {} : matchPack(packs);
   const offer = (avail.offers || []).find((o) => o.date === e.date);
   const key = (offer && (offer.date || offer.day)) || e.date;
   let yes = 0;
@@ -49,36 +71,56 @@ function offerCalTitle(o) {
 }
 
 function openMatchDays(events, packs) {
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const today = schedToday();
   const taken = {};
   for (const e of events || []) {
-    if (!e.date) continue;
-    const kind = eventKind(e);
-    taken[e.date + ":" + kind] = true;
+    if (e && e.date) taken[e.date + ":" + eventKind(e)] = true;
   }
-  const books = [
-    ["league", "open", "availability"],
-    ["tournament", "tournament", "availability"],
-    ["practice", "practice", "practice"],
-  ];
   const extra = [];
-  for (const [pack, kind, path] of books) {
-    for (const o of ((packs && packs[pack]) || {}).offers || []) {
-      if (!o.date || o.date < today) continue;
-      if (taken[o.date + ":" + eventKind({ kind: pack })]) continue;
-      extra.push({
-        date: o.date,
-        title: offerCalTitle(o),
-        kind,
-        status: "open",
-        note: o.note,
-        path,
-      });
-      taken[o.date + ":" + eventKind({ kind: pack })] = true;
-    }
+  for (const o of matchPack(packs).offers || []) {
+    if (!o.date || o.date < today) continue;
+    const kind = o.source === "tournament" ? "tournament" : "league";
+    if (taken[o.date + ":" + kind] || taken[o.date + ":league"] || taken[o.date + ":tournament"]) continue;
+    extra.push({
+      date: o.date,
+      title: offerCalTitle(o),
+      kind: kind === "tournament" ? "tournament" : "open",
+      status: "open",
+      note: o.note,
+      path: "availability",
+    });
+    taken[o.date + ":" + kind] = true;
+  }
+  for (const o of ((packs && packs.practice) || {}).offers || []) {
+    if (!o.date || o.date < today || taken[o.date + ":practice"]) continue;
+    extra.push({
+      date: o.date,
+      title: offerCalTitle(o),
+      kind: "practice",
+      status: "open",
+      note: o.note,
+      path: "practice",
+    });
+    taken[o.date + ":practice"] = true;
   }
   return extra;
+}
+
+function upcomingAvailRow(monthKey, packs) {
+  const today = schedToday();
+  const offers = (matchPack(packs).offers || []).filter((o) => o && o.date && o.date >= today);
+  if (!offers.length) return "";
+  const buttons = offers
+    .map((o) => {
+      const mk = o.date.slice(0, 7);
+      const when = new Date(o.date + "T12:00:00");
+      const label = when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      const fake = { date: o.date, kind: o.source === "tournament" ? "tournament" : "open", status: "open", title: offerCalTitle(o) };
+      const on = mk === monthKey ? " on" : "";
+      return `<button class="btn ghost${on}" type="button" data-jump="${escapeHtml(mk)}" title="${escapeHtml(o.note || "")}">${escapeHtml(label)} · ${escapeHtml(offerCalTitle(o))} · ${escapeHtml(eventHeadcount(fake, packs))}</button>`;
+    })
+    .join("");
+  return `<div class="cal-avail"><p class="kicker">Available match days</p>${buttons}</div>`;
 }
 
 function recordFromWhen(e) {
@@ -127,11 +169,12 @@ function calPillBits(e, packs) {
   const title = escapeHtml(e.title);
   const count = eventHeadcount(e, packs);
   const kind = eventKind(e);
-  const needed = ((packs && packs[kind]) || {}).needed || 6;
+  const needed = ((kind === "practice" ? packs && packs.practice : matchPack(packs)) || {}).needed || 6;
   const yes = parseInt(count, 10) || 0;
   const rec = typeof eventRecord === "function" ? eventRecord(e) : null;
   const go = e.status !== "played" && yes >= needed;
-  let cls = e.kind === "open"
+  const open = isAvailNight(e, packs, schedToday());
+  let cls = open || e.kind === "open"
     ? `cal-pill open${go ? " go" : ""}`
     : `cal-pill ${e.kind} ${e.status}${go ? " go" : ""}`;
   if (rec) cls += rec.mark === "W" ? " win" : rec.mark === "L" ? " loss" : " tie";
@@ -189,14 +232,15 @@ function renderCalendarMonth(events, monthKey, packs) {
     const book = packs && packs.book;
     const tags = calDayTags(hits, packs);
     const pills = hits.map((e) => calPill(e, packs) + schedFavorHtml(e, book)).join("");
-    const lockedHits = hits.filter((e) => e.status !== "open" && e.kind !== "open");
+    const availHits = hits.filter((e) => isAvailNight(e, packs, today));
+    const lockedHits = hits.filter((e) => e.status !== "open" && e.kind !== "open" && !isAvailNight(e, packs, today));
     const todayOn = iso === today;
     const dayN = todayOn ? `${d} · Today` : String(d);
     const todayLook = todayOn
       ? "border-color:var(--gold);box-shadow:0 0 14px rgba(240,193,75,0.45);background:rgba(240,193,75,0.1)"
       : "";
     const numStyle = todayOn ? ' style="color:var(--gold);font-weight:700"' : "";
-    const cellClass = lockedHits.length ? "has" : hits.length ? "offer" : "";
+    const cellClass = availHits.length ? "offer" : lockedHits.length ? "has" : hits.length ? "offer" : "";
     if (hits.length === 1 && isTeam()) {
       const e = hits[0];
       const p = calPillBits(e, packs);
@@ -216,6 +260,7 @@ function renderCalendarMonth(events, monthKey, packs) {
       <h2 data-month="${escapeHtml(monthKey)}">${escapeHtml(label)}</h2>
       <button class="btn ghost" type="button" id="cal-next">Next</button>
     </div>
+    ${upcomingAvailRow(monthKey, packs)}
     <div class="cal-grid">${heads}${cells.join("")}</div>
   `;
 }
@@ -246,4 +291,7 @@ function bindSchedule(schedule, avail, packs) {
   const next = document.getElementById("cal-next");
   if (prev) prev.addEventListener("click", () => shift(-1));
   if (next) next.addEventListener("click", () => shift(1));
+  document.querySelectorAll("[data-jump]").forEach((btn) => {
+    btn.addEventListener("click", () => redraw("calendar", btn.dataset.jump));
+  });
 }

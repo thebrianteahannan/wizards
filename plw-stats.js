@@ -98,16 +98,135 @@ function attachIds(rows, players) {
   return out;
 }
 
-function mergeKind(leagueRows, tourneyRows, players) {
+function fmtRate(n, d) {
+  if (!d) return ".000";
+  const t = Math.round((n / d) * 1000);
+  if (t >= 1000) return (t / 1000).toFixed(3);
+  return "." + String(Math.max(0, t)).padStart(3, "0");
+}
+
+function sumKey(parts, key) {
+  return parts.reduce((a, r) => a + (Number(r[key]) || 0), 0);
+}
+
+function innings(v) {
+  const parts = String(v == null ? "" : v).split(".");
+  return (Number(parts[0]) || 0) + (Number(parts[1]) || 0) / 3;
+}
+
+function fmtIp(n) {
+  const whole = Math.floor(n + 1e-9);
+  const outs = Math.round((n - whole) * 3);
+  return whole + "." + outs;
+}
+
+function hasBat(row) {
+  return row && (Number(row.g) > 0 || Number(row.ab) > 0 || Number(row.tpa) > 0);
+}
+
+function hasArm(row) {
+  return row && innings(row.ip) > 0;
+}
+
+function combineBat(league, tourney) {
+  const parts = [league, tourney].filter(hasBat);
+  if (!parts.length) return null;
+  if (parts.length === 1) return { ...parts[0] };
+  const ab = sumKey(parts, "ab");
+  const h = sumKey(parts, "h");
+  const tb = sumKey(parts, "tb");
+  const bb = sumKey(parts, "bb");
+  const tpa = sumKey(parts, "tpa");
+  const slgN = ab ? tb / ab : 0;
+  const obpN = tpa ? (h + bb) / tpa : 0;
+  return {
+    g: sumKey(parts, "g"),
+    avg: fmtRate(h, ab),
+    slg: fmtRate(tb, ab),
+    obp: fmtRate(h + bb, tpa),
+    ab: String(ab),
+    r: String(sumKey(parts, "r")),
+    h: String(h),
+    singles: String(sumKey(parts, "singles")),
+    doubles: String(sumKey(parts, "doubles")),
+    triples: String(sumKey(parts, "triples")),
+    hr: String(sumKey(parts, "hr")),
+    rbi: String(sumKey(parts, "rbi")),
+    tb: String(tb),
+    so: String(sumKey(parts, "so")),
+    bb: String(bb),
+    sf: String(sumKey(parts, "sf")),
+    tpa: String(tpa),
+    roe: String(sumKey(parts, "roe")),
+    ops: fmtRate(obpN + slgN, 1),
+    fc: String(sumKey(parts, "fc")),
+  };
+}
+
+function combinePitch(league, tourney) {
+  const parts = [league, tourney].filter(hasArm);
+  if (!parts.length) return league || tourney || null;
+  if (parts.length === 1) return { ...parts[0] };
+  const ips = parts.map((r) => innings(r.ip));
+  const ip = ips.reduce((a, n) => a + n, 0);
+  const wavg = (key) => (ip ? parts.reduce((a, r, i) => a + (Number(r[key]) || 0) * ips[i], 0) / ip : 0);
+  const h = sumKey(parts, "h");
+  const bb = sumKey(parts, "bb");
+  const bf = sumKey(parts, "bf");
+  const ab = Math.max(0, bf - bb);
+  return {
+    g: sumKey(parts, "g"),
+    w: String(sumKey(parts, "w")),
+    l: String(sumKey(parts, "l")),
+    sv: String(sumKey(parts, "sv")),
+    era: wavg("era").toFixed(2),
+    ip: fmtIp(ip),
+    h: String(h),
+    r: String(sumKey(parts, "r")),
+    er: String(sumKey(parts, "er")),
+    bb: String(bb),
+    so: String(sumKey(parts, "so")),
+    hr: String(sumKey(parts, "hr")),
+    bf: String(bf),
+    gs: String(sumKey(parts, "gs")),
+    cg: String(sumKey(parts, "cg")),
+    sho: String(sumKey(parts, "sho")),
+    avg: fmtRate(h, ab),
+    whip: ip ? ((h + bb) / ip).toFixed(2) : "0.00",
+    sox: wavg("sox").toFixed(2),
+    bbx: wavg("bbx").toFixed(2),
+  };
+}
+
+function stamp(row, source) {
+  return row ? { ...row, source } : null;
+}
+
+function packKind(leagueRows, tourneyRows, players, combine) {
   const league = attachIds(leagueRows, players || []);
   const tourney = attachIds(tourneyRows, players || []);
-  const byId = {};
-  for (const row of tourney) byId[row.playerId] = { ...row, source: SEASONS[1].label };
-  const usedLeague = league.some((r) => r.g > 0);
-  if (usedLeague) {
-    for (const row of league) byId[row.playerId] = { ...row, source: SEASONS[0].label };
+  const byL = {};
+  const byT = {};
+  for (const row of league) byL[row.playerId] = row;
+  for (const row of tourney) byT[row.playerId] = row;
+  const rows = [];
+  for (const id of new Set([...Object.keys(byL), ...Object.keys(byT)])) {
+    const l = stamp(byL[id], SEASONS[0].label);
+    const t = stamp(byT[id], SEASONS[1].label);
+    const total = combine(l, t) || {};
+    const src = l && t ? "combined" : ((l || t).source);
+    rows.push({
+      ...total,
+      playerId: id,
+      name: (l || t).name,
+      last: (l || t).last,
+      first: (l || t).first,
+      league: l,
+      tourney: t,
+      source: src,
+    });
   }
-  return { rows: Object.values(byId), usedLeague };
+  return { rows, usedLeague: league.some((r) => r.g > 0) };
 }
 
 async function getPlwStats(players, force) {
@@ -118,18 +237,19 @@ async function getPlwStats(players, force) {
     fetchTable(PITCHER_URL, SEASONS[0].id, PITCH_KEYS),
     fetchTable(PITCHER_URL, SEASONS[1].id, PITCH_KEYS),
   ]);
-  const bats = mergeKind(bL, bT, players);
+  const bats = packKind(bL, bT, players, combineBat);
   for (const row of bats.rows) {
-    if (row.playerId !== "brian-hannan" || Number(row.h) >= 1) continue;
-    row.h = "1";
-    row.singles = "1";
-    row.tb = "1";
-    row.avg = ".167";
-    row.slg = ".167";
-    row.obp = ".500";
-    row.ops = ".667";
+    if (row.playerId !== "brian-hannan") continue;
+    if (row.tourney && Number(row.tourney.h) < 1) {
+      Object.assign(row.tourney, { h: "1", singles: "1", tb: "1", avg: ".167", slg: ".167", obp: ".500", ops: ".667" });
+    } else if (!row.tourney && Number(row.h) < 1) {
+      Object.assign(row, { h: "1", singles: "1", tb: "1", avg: ".167", slg: ".167", obp: ".500", ops: ".667" });
+      continue;
+    }
+    const meta = { playerId: row.playerId, name: row.name, last: row.last, first: row.first, league: row.league, tourney: row.tourney, source: row.league && row.tourney ? "combined" : row.source };
+    Object.assign(row, combineBat(row.league, row.tourney) || {}, meta);
   }
-  const arms = mergeKind(pL, pT, players);
+  const arms = packKind(pL, pT, players, combinePitch);
   const wizPitch = [
     {
       last: "Hannan",
@@ -178,19 +298,21 @@ async function getPlwStats(players, force) {
     { last: "Dupe", first: "Cam", name: "Cam Dupe", playerId: "cam", source: "Staff" },
   ];
   for (const line of wizPitch) {
-    if (arms.rows.some((r) => r.playerId === line.playerId && parseFloat(r.ip) > 0)) continue;
     const i = arms.rows.findIndex((r) => r.playerId === line.playerId);
-    if (i >= 0) Object.assign(arms.rows[i], line);
-    else arms.rows.push(line);
+    if (i >= 0 && innings(arms.rows[i].ip) > 0) continue;
+    if (i < 0) {
+      arms.rows.push({ ...line, league: null, tourney: line.ip ? { ...line } : null });
+      continue;
+    }
+    const row = arms.rows[i];
+    if (line.ip && !hasArm(row.tourney)) row.tourney = { ...line };
+    const meta = { playerId: row.playerId, name: row.name, last: row.last, first: row.first, league: row.league, tourney: row.tourney, source: row.league && row.tourney ? "combined" : line.source || row.source };
+    Object.assign(row, combinePitch(row.league, row.tourney) || line, meta);
   }
-  const note = bats.usedLeague
-    ? "Florida Challengers League averages."
-    : "No league games posted yet — showing 2026 Tourney Season averages.";
-  const pitchNote = (arms.rows.length
-    ? arms.usedLeague
-      ? "Florida Challengers League pitching."
-      : "No league pitching posted yet — showing 2026 Tourney Season."
-    : "PLW has no Wizard pitching lines posted yet.") + " Jose and Cam are on the staff — no IP posted yet.";
+  const note = "League, tourney, and combined PLW averages.";
+  const pitchNote = arms.rows.length
+    ? "League, tourney, and combined PLW pitching."
+    : "PLW has no Wizard pitching lines posted yet.";
   cache = {
     at: Date.now(),
     data: {

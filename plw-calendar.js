@@ -1,6 +1,11 @@
 const LEAGUE = 61713;
 const CAL_URL =
   "https://www.mystatsonline.com/ballsports/visitor/league/schedule_scores/calendar.aspx?IDLeague=" + LEAGUE;
+const FCL_TEAMS = [228246, 131104, 228242, 228245, 228493, 228247, 228239, 130071, 228240, 130404, 229625];
+
+function teamPage(id) {
+  return "https://www.mystatsonline.com/ballsports/visitor/league/stats/team.aspx?IDLeague=" + LEAGUE + "&IDSeason=110335&IDTeam=" + id;
+}
 
 const MONTHS = {
   January: 0,
@@ -29,6 +34,25 @@ const TEAM_NAMES = {
   TBD: "To Be Determined",
   WAR: "Warbirds",
   PUF: "Pufferfish",
+  SMG: "Smugglers",
+  GUN: "Gunslingers",
+  LEV: "Leviathans",
+  CLS: "Cloud Seeders",
+};
+
+const MONTH_ABBR = {
+  JAN: 0,
+  FEB: 1,
+  MAR: 2,
+  APR: 3,
+  MAY: 4,
+  JUN: 5,
+  JUL: 6,
+  AUG: 7,
+  SEP: 8,
+  OCT: 9,
+  NOV: 10,
+  DEC: 11,
 };
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -137,7 +161,7 @@ function parseMonthNights(html) {
   if (!monthHit) return [];
   const year0 = Number(monthHit[2]);
   const month0 = MONTHS[monthHit[1]];
-  const parts = String(html || "").split(/class="(cal-date(?:-other)?)"/);
+  const parts = String(html || "").split(/class="(cal-date(?:-other|-today)?)"/);
   const byDate = {};
   for (let i = 1; i < parts.length; i += 2) {
     const kind = parts[i];
@@ -226,19 +250,71 @@ function offerFromNight(night) {
 
 function mergeNights(into, extra) {
   for (const n of extra || []) {
-    if (!into.some((x) => x.date === n.date)) into.push(n);
+    const i = into.findIndex((x) => x.date === n.date);
+    if (i < 0) {
+      into.push(n);
+      continue;
+    }
+    const fresh = (n.games || []).some((g) => isScore(g.time));
+    const old = (into[i].games || []).some((g) => isScore(g.time));
+    if (fresh && !old) into[i] = n;
+    else if (fresh && (n.games || []).length >= (into[i].games || []).length) into[i] = n;
+    else if (!fresh && !old) {
+      const seen = new Set((into[i].games || []).map((g) => g.away + "|" + g.time + "|" + g.home));
+      for (const g of n.games || []) {
+        const k = g.away + "|" + g.time + "|" + g.home;
+        if (!seen.has(k)) {
+          into[i].games.push(g);
+          seen.add(k);
+        }
+      }
+    }
   }
+}
+
+function bannerStamp(mon, day) {
+  const mo = MONTH_ABBR[String(mon || "").slice(0, 3).toUpperCase()];
+  if (mo == null || !day) return "";
+  const now = new Date();
+  let y = now.getFullYear();
+  const iso = (yy) => yy + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+  const diff = (new Date(iso(y) + "T12:00:00") - now) / 86400000;
+  if (diff > 180) y -= 1;
+  if (diff < -300) y += 1;
+  return iso(y);
+}
+
+function parseSlickNights(html) {
+  const nights = [];
+  for (const block of String(html || "").split(/class="slick-game-date"/).slice(1)) {
+    const dm = block.match(/^>\s*([A-Za-z]{3})<br\/?>([A-Za-z]{3})<br\/?>(\d{1,2})/);
+    if (!dm) continue;
+    const date = bannerStamp(dm[2], Number(dm[3]));
+    if (!date) continue;
+    const games = [];
+    for (const card of block.split(/id="bannerGames_rptGame_pnlGame_\d+"/).slice(1)) {
+      const labs = [...card.matchAll(/slick-game-label-abbr[^>]*>([^<]+)/g)].map((m) => m[1].trim());
+      if (labs.length < 2 || ![labs[0], labs[1]].some((t) => t === "WIZ" || t === "TBD")) continue;
+      const scores = [...card.matchAll(/slick-game-score[^>]*>([^<]*)/g)].map((m) => m[1].trim()).filter(Boolean);
+      const clock = normalizeTime((card.match(/slick-game-state[^>]*>\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i) || [])[1] || "");
+      const time = scores.length >= 2 ? scores[0] + " - " + scores[1] : clock;
+      if (!time || time === "11:11 AM") continue;
+      games.push({ away: labs[0], home: labs[1], time });
+    }
+    if (games.length) nights.push({ date, games });
+  }
+  return nights;
 }
 
 async function loadCalendarNights(force) {
   if (!force && cache.nights && Date.now() - cache.at < 10 * 60 * 1000) return cache.nights;
   const first = await fetchHtml(CAL_URL);
   const nights = parseMonthNights(first);
+  try { mergeNights(nights, await fetchPostedMonth(first, prevMonthArg(first))); } catch (_) {}
+  try { mergeNights(nights, await fetchPostedMonth(first, nextMonthArg(first))); } catch (_) {}
   try {
-    mergeNights(nights, await fetchPostedMonth(first, prevMonthArg(first)));
-  } catch (_) {}
-  try {
-    mergeNights(nights, await fetchPostedMonth(first, nextMonthArg(first)));
+    const pages = await Promise.all(FCL_TEAMS.map((id) => fetchHtml(teamPage(id)).catch(() => "")));
+    for (const html of pages) mergeNights(nights, parseSlickNights(html));
   } catch (_) {}
   nights.sort((a, b) => a.date.localeCompare(b.date));
   cache = { at: Date.now(), nights, error: "" };
@@ -273,9 +349,20 @@ async function syncLeagueOffers(avail, opts) {
 function eventFromWizNight(night) {
   const games = (night.games || []).filter((g) => g.away === "WIZ" || g.home === "WIZ");
   if (!games.length) return null;
+  const opps = [];
+  const seen = new Set();
+  for (const g of games) {
+    const code = g.away === "WIZ" ? g.home : g.away;
+    if (seen.has(code)) continue;
+    seen.add(code);
+    opps.push(teamName(code));
+  }
   const wiz = games[0];
-  const them = wiz.away === "WIZ" ? wiz.home : wiz.away;
-  const title = wiz.home === "WIZ" ? teamName(them) + " vs Wizards" : "Wizards vs " + teamName(them);
+  const title = opps.length > 1
+    ? "vs " + opps.join(", ")
+    : wiz.home === "WIZ"
+      ? opps[0] + " vs Wizards"
+      : "Wizards vs " + opps[0];
   const today = todayStamp();
   const clocks = games.map((g) => g.time).filter(isClock);
   const scores = games.map((g) => g.time).filter(isScore);
@@ -334,9 +421,13 @@ async function syncScheduleEvents(schedule, opts) {
   const kept = [];
   let changed = false;
   for (const e of schedule.events || []) {
-    if (e && e.source === "mystats" && e.date >= today && !incomingIds.has(e.id)) {
-      changed = true;
-      continue;
+    if (e && e.source === "mystats" && !incomingIds.has(e.id)) {
+      const futureGone = e.date >= today;
+      const phantom = incoming.some((ev) => ev.date !== e.date && ev.when && ev.when === e.when && ev.record && ev.record === e.record);
+      if (futureGone || phantom) {
+        changed = true;
+        continue;
+      }
     }
     kept.push(e);
   }

@@ -56,8 +56,22 @@ function isArm(player, row) {
 }
 
 function pitchLine(row) {
-  if (!row || !(pitchInnings(row.ip) > 0)) return `<span class="muted">No PLW pitching line yet</span>`;
+  if (!row || !(pitchInnings(row.ip) > 0)) return "";
   return PITCH_LINE.map(([key, label]) => `${label} ${escapeHtml(row[key] == null || row[key] === "" ? "—" : String(row[key]))}`).join(" · ");
+}
+
+function pitchBlock(row) {
+  if (!row) return `<span class="muted">No PLW pitching line yet</span>`;
+  const lineOf = (data) => {
+    const text = pitchLine(data);
+    return text || `<span class="muted">—</span>`;
+  };
+  if (!row.league && !row.tourney && !(pitchInnings(row.ip) > 0)) return `<span class="muted">No PLW pitching line yet</span>`;
+  const one = (label, data) => {
+    const body = data && pitchInnings(data.ip) > 0 ? lineOf(data) : `<span class="muted">—</span>`;
+    return `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="display:inline-block;width:3.7rem;color:var(--cyan);font-size:0.62rem;letter-spacing:0.06em">${label}</span> ${body}</div>`;
+  };
+  return `<div style="min-width:0">${one("League", row.league)}${one("Tourney", row.tourney)}${one("Total", row)}</div>`;
 }
 
 function rotationPlayers(roster, stats, customIds) {
@@ -98,12 +112,12 @@ function renderPitching(roster, stats, customIds) {
       const move = admin
         ? `<span><button type="button" class="btn ghost" data-pit-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-pit-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
-      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${pitchTone(score)}">${score}${/tourney/i.test(String((row && row.source) || "")) ? "*" : ""}</b>`;
-      return `<div class="roster-row" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:center">
+      const grade = score == null ? `<span class="muted">—</span>` : `<b style="${pitchTone(score)}">${score}</b>`;
+      return `<div class="roster-row" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
         <span class="num">${i + 1}</span>
         <span class="num" title="Pitch rating">${grade}</span>
         <strong>${escapeHtml(p.name)}</strong>
-        <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.72rem">${pitchLine(row)}</div>
+        <div class="muted" style="font-size:0.72rem;line-height:1.35">${pitchBlock(row)}</div>
         ${move}
       </div>`;
     })
