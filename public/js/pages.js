@@ -8,7 +8,7 @@ const DAYS_META = [
   ["sunday", "Sun"],
 ];
 
-function renderHome(roster, schedule, avail, fees, tourneyAvail) {
+function renderHome(roster, schedule, avail, fees, tourneyAvail, stats) {
   const locked = avail.lockedNight;
   const today = new Date().toISOString().slice(0, 10);
   const next = (schedule.events || []).find((e) => e.date >= today) || (schedule.events || []).at(-1);
@@ -99,7 +99,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail) {
       ${duesStat}
     </section>
     <section style="margin-top:1.2rem">
-      ${renderRosterEmbed(roster, avail, tourneyAvail, "dg-home", "h2")}
+      ${renderRosterEmbed(roster, avail, tourneyAvail, "dg-home", "h2", stats)}
     </section>
     <section class="grid-2" style="margin-top:1rem">
       <article class="card">

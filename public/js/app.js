@@ -39,23 +39,25 @@ async function load() {
   app.innerHTML = "<p class='muted'>Loading…</p>";
   try {
     if (route === "home") {
-      const [roster, schedule, avail, fees, tourneyAvail] = await Promise.all([
+      const [roster, schedule, avail, fees, tourneyAvail, stats] = await Promise.all([
         api.get("/api/roster"),
         api.get("/api/schedule"),
         api.get("/api/availability?kind=league"),
         isTeam() ? api.get("/api/fees") : Promise.resolve({}),
         api.get("/api/availability?kind=tournament"),
+        api.get("/api/plw-stats").catch(() => ({ batters: [] })),
       ]);
-      app.innerHTML = renderHome(roster, schedule, avail, fees, tourneyAvail);
-      bindRoster(roster, avail, tourneyAvail);
+      app.innerHTML = renderHome(roster, schedule, avail, fees, tourneyAvail, stats);
+      bindRoster(roster, avail, tourneyAvail, stats);
     } else if (route === "roster") {
-      const [roster, leagueAvail, tourneyAvail] = await Promise.all([
+      const [roster, leagueAvail, tourneyAvail, stats] = await Promise.all([
         api.get("/api/roster"),
         api.get("/api/availability?kind=league"),
         api.get("/api/availability?kind=tournament"),
+        api.get("/api/plw-stats").catch(() => ({ batters: [] })),
       ]);
-      app.innerHTML = renderRoster(roster, leagueAvail, tourneyAvail);
-      bindRoster(roster, leagueAvail, tourneyAvail);
+      app.innerHTML = renderRoster(roster, leagueAvail, tourneyAvail, stats);
+      bindRoster(roster, leagueAvail, tourneyAvail, stats);
     } else if (route === "schedule") {
       const [schedule, leagueAvail, tourneyAvail, practiceAvail, book] = await Promise.all([
         api.get("/api/schedule"),

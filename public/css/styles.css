@@ -331,6 +331,14 @@ a.hud:hover { border-color: var(--cyan); }
   font-weight: 400;
   line-height: 1.2;
 }
+.roster-avg {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: left !important;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 button.roster-limits { cursor: pointer; }
 .diamond-card { padding: 0.9rem; }
 .diamond { position: relative; width: 100%; aspect-ratio: 1; max-height: 420px; }

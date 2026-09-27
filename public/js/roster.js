@@ -23,7 +23,7 @@ function playerMark(avail, playerId, offer, kind) {
   return entry.status === "yes" || entry.status === "maybe" ? entry.status : "";
 }
 
-function rosterRows(players, dead) {
+function rosterRows(players, dead, stats) {
   const admin = isAdmin();
   const lastCol = admin ? (dead ? "11.5rem" : "6.8rem") : "5.2rem";
   const offStatuses = [
@@ -35,7 +35,6 @@ function rosterRows(players, dead) {
     .map((p, i) => {
       const pos = (p.positions || []).join(", ") || "Util";
       const cur = typeof rosterStatus === "function" ? rosterStatus(p) : p.status || "Active";
-      const limits = String(p.limits || "").trim();
       const tag = !dead && admin
         ? `<button type="button" class="tag" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer;background:transparent;color:inherit;font:inherit;white-space:nowrap">${escapeHtml(pos)}</button>`
         : `<span class="tag" style="white-space:nowrap">${escapeHtml(pos)}</span>`;
@@ -61,18 +60,11 @@ function rosterRows(players, dead) {
       } else {
         last = `<span class="muted">${p.born ? escapeHtml(p.born) : ""}</span>`;
       }
-      const when = !dead && limits
-        ? admin
-          ? `<button type="button" class="muted roster-limits" data-edit-limits="${escapeHtml(p.id)}" title="${escapeHtml(limits)}">${escapeHtml(limits)}</button>`
-          : `<span class="muted roster-limits" title="${escapeHtml(limits)}">${escapeHtml(limits)}</span>`
-        : "";
-      const nameBtn = admin && !dead && !limits
-        ? ` data-edit-limits="${escapeHtml(p.id)}" title="Add availability" style="cursor:pointer"`
-        : "";
+      const avg = `<span class="muted roster-avg" title="Combined batting average">${escapeHtml(rosterAvgText(stats, p))}</span>`;
       return `
         <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem ${lastCol};${dead ? "opacity:0.55" : ""}">
           <span class="num">${i + 1}</span>
-          <span class="roster-who"><strong${nameBtn}>${escapeHtml(p.name)}</strong>${when}</span>
+          <span class="roster-who"><strong>${escapeHtml(p.name)}</strong>${avg}</span>
           <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
           ${tag}
           ${last}
@@ -256,56 +248,73 @@ function pickPitcherId(players, kind) {
 }
 
 function fieldLayout(players, pitcherId) {
-  const FIELD = ["CF", "LF", "3B", "SS", "2B/RF"];
-  const IF_FIRST = ["3B", "SS", "2B/RF", "CF", "LF"];
+  const FIELD = ["CF", "LF", "3B", "SS", "2B"];
+  const IF_FIRST = ["3B", "SS", "2B", "CF", "LF"];
   const spots = [
     { key: "CF", left: "50%", top: "10%" },
     { key: "LF", left: "16%", top: "22%" },
     { key: "3B", left: "18%", top: "48%" },
     { key: "SS", left: "38%", top: "36%" },
-    { key: "2B/RF", left: "72%", top: "32%" },
+    { key: "2B", left: "72%", top: "32%" },
     { key: "P", left: "50%", top: "58%" },
   ];
   const pitcher = players.find((p) => p.id === pitcherId) || pitcherArms(players)[0];
-  const others = players.filter((p) => p.id !== (pitcher && pitcher.id));
   const extras = pitcherArms(players).filter((p) => !pitcher || p.id !== pitcher.id);
-  const at = { CF: [], LF: [], "3B": [], SS: [], "2B/RF": [], P: pitcher ? [pitcher, ...extras] : extras.slice() };
+  const at = { CF: [], LF: [], "3B": [], SS: [], "2B": [], P: pitcher ? [pitcher, ...extras] : extras.slice() };
   const cover = (pos) =>
     pos === "P"
       ? []
       : pos === "IF"
-        ? ["3B", "SS", "2B/RF"]
-        : pos === "OF"
-          ? ["LF", "CF", "2B/RF"]
-          : pos === "2B" || pos === "RF"
-            ? ["2B/RF"]
-            : FIELD.includes(pos)
-              ? [pos]
-              : [];
-  for (const p of others) {
-    (p.positions || []).forEach((pos, idx) => {
+        ? ["3B", "SS", "2B"]
+        : pos === "OF" || pos === "RF"
+          ? ["LF", "CF"]
+          : pos === "Util"
+            ? FIELD.slice()
+            : pos === "2B"
+              ? ["2B"]
+              : FIELD.includes(pos)
+                ? [pos]
+                : [];
+  const ofOnly = (p) => {
+    const pos = p.positions || [];
+    const inf = pos.some((x) => x === "IF" || x === "2B" || x === "3B" || x === "SS" || x === "Util");
+    return pos.some((x) => x === "OF" || x === "LF" || x === "CF" || x === "RF") && !inf;
+  };
+  const canFill = (spot, p) => spot !== "2B" || !ofOnly(p);
+  for (const p of players) {
+    const posList = p.positions || [];
+    const primaryAt = posList.findIndex((x) => cover(x).length);
+    posList.forEach((pos, idx) => {
       for (const spot of cover(pos)) {
         if (at[spot].some((x) => x.id === p.id)) continue;
-        if (idx === 0) at[spot].unshift(p);
+        if (idx === primaryAt) at[spot].unshift(p);
         else at[spot].push(p);
       }
     });
   }
   const onField = (p) => FIELD.some((k) => at[k].some((x) => x.id === p.id));
-  const placed = new Set(pitcher ? [pitcher.id] : []);
+  const placed = new Set();
   extras.forEach((p) => placed.add(p.id));
   for (const key of FIELD) at[key].forEach((p) => placed.add(p.id));
-  const pool = others.filter((p) => !placed.has(p.id));
+  if (pitcher) placed.add(pitcher.id);
+  const pool = players.filter((p) => !placed.has(p.id));
   for (const key of FIELD) {
-    if (!at[key].length && pool.length) at[key].push(pool.shift());
+    if (at[key].length) continue;
+    const i = pool.findIndex((p) => canFill(key, p));
+    if (i >= 0) at[key].push(pool.splice(i, 1)[0]);
   }
   const extraPool = extras.filter((p) => !onField(p));
   for (const key of IF_FIRST) {
-    if (!at[key].length && extraPool.length) at[key].push(extraPool.shift());
+    if (at[key].length) continue;
+    const i = extraPool.findIndex((p) => canFill(key, p));
+    if (i >= 0) at[key].push(extraPool.splice(i, 1)[0]);
   }
   while (pool.length) {
-    const open = FIELD.filter((k) => at[k].length < 2).sort((a, b) => at[a].length - at[b].length);
-    if (!open.length) break;
+    const open = FIELD.filter((k) => at[k].length < 2 && canFill(k, pool[0])).sort((a, b) => at[a].length - at[b].length);
+    if (!open.length) {
+      pool.shift();
+      continue;
+    }
     at[open[0]].push(pool.shift());
   }
   return { spots: spots.map((s) => ({ ...s, here: at[s.key] })), bench: pool };
@@ -320,7 +329,7 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId, extraBench) {
       }
       const anyYes = spot.here.some((p) => marks[p.id] === "yes");
       const anyMaybe = spot.here.some((p) => marks[p.id] === "maybe");
-      const glow = anyYes ? " going" : anyMaybe ? " maybe-go" : "";
+      const glow = Object.keys(marks).length && anyYes ? " going" : Object.keys(marks).length && anyMaybe ? " maybe-go" : "";
       const names = spot.here
         .map((p, i) => {
           const mark = marks[p.id] || "";
@@ -347,11 +356,13 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId, extraBench) {
     ? new Date(offer.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
     : "";
   const mound = players.find((p) => p.id === pitcherId);
+  const marked = Object.keys(marks).some((id) => marks[id]);
+  const tone = marked ? " Green is committed, gold is maybe." : "";
   const note = !players.length
     ? `<p class="muted">Select a date to see that night's potential roster.</p>`
     : mound
-      ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Green is committed, gold is maybe.</p>`
-      : `<p class="muted">3B, SS, 2B/RF, LF, CF, and P.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""} Green is committed, gold is maybe.</p>`;
+      ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""}${tone}</p>`
+      : `<p class="muted">3B, SS, 2B, LF, CF, and P.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""}${tone}</p>`;
   return `
     <div class="diamond-card card">
       <p class="kicker">Defense</p>
@@ -478,17 +489,31 @@ function paintAvailDiamond(card, roster, avail, kind, offer, toggle) {
   }
 }
 
-function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading) {
+function rosterAvg(stats, p) {
+  const hit = typeof batterRow === "function" ? batterRow(stats, p) : null;
+  const n = parseFloat(hit && hit.avg);
+  return Number.isFinite(n) ? n : -1;
+}
+
+function sortByAvg(players, stats) {
+  if (!stats) return players;
+  return players.slice().sort((a, b) => rosterAvg(stats, b) - rosterAvg(stats, a) || String(a.name).localeCompare(String(b.name)));
+}
+
+function rosterAvgText(stats, p) {
+  const hit = typeof batterRow === "function" ? batterRow(stats, p) : null;
+  const raw = hit && hit.avg != null && hit.avg !== "" ? String(hit.avg) : "";
+  if (!raw || rosterAvg(stats, p) < 0) return "—";
+  return raw;
+}
+
+function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading, stats) {
   const active = roster.players.filter(isActive);
   const inactive = roster.players.filter((p) => !isActive(p));
   const leagueOffer = nextProposed(leagueAvail || {});
   const tourneyOffer = nextProposed(tourneyAvail || {});
   const avail = !leagueOffer || (tourneyOffer && tourneyOffer.date < leagueOffer.date) ? tourneyAvail || {} : leagueAvail || {};
   const offer = nextProposed(avail);
-  const marks = {};
-  if (offer) {
-    for (const p of active) marks[p.id] = playerMark(avail, p.id, offer);
-  }
   const pitcherId = pickPitcherId(active);
   const title = heading === "h2" ? "h2" : "h1";
   return `
@@ -501,30 +526,30 @@ function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading) {
       </div>
       <p class="muted">Locked roster · need 6 to take a night · ${active.length} on the book</p>
       <div class="roster-layout">
-        ${rosterDiamond(active, svgId || "dg-roster", marks, offer, pitcherId)}
-        <div class="roster-list">${rosterRows(active)}</div>
+        ${rosterDiamond(active, svgId || "dg-roster", {}, offer, pitcherId)}
+        <div class="roster-list">${rosterRows(sortByAvg(active, stats), false, stats)}</div>
       </div>
-      ${inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Sideline · IR / New / Away</p>${rosterRows(inactive, true)}</div>` : ""}
+      ${inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Sideline · IR / New / Away</p>${rosterRows(inactive, true, stats)}</div>` : ""}
     </div>
   `;
 }
-function renderRoster(roster, leagueAvail, tourneyAvail) {
+function renderRoster(roster, leagueAvail, tourneyAvail, stats) {
   return `
     <p class="lede">One locked Wizards roster. Co-managers: Tony Kurtanick and Brian Hannan.</p>
     ${isTeam() ? `<div class="actions" style="margin:0.7rem 0 0"><button class="btn ghost" type="button" id="show-phones">Phone numbers</button></div><div id="phone-list" class="card phone-list" hidden></div>` : ""}
-    ${renderRosterEmbed(roster, leagueAvail, tourneyAvail, "dg-roster", "h1")}
+    ${renderRosterEmbed(roster, leagueAvail, tourneyAvail, "dg-roster", "h1", stats)}
     <div id="offense-host"></div>
     <div id="pitching-host"></div>
   `;
 }
 
-function bindRoster(roster, leagueAvail, tourneyAvail) {
+function bindRoster(roster, leagueAvail, tourneyAvail, stats) {
   const redraw = () => {
     const box = document.getElementById("roster-embed");
     const svgId = (box && box.dataset.svg) || "dg-roster";
     const heading = box && box.querySelector("h2") ? "h2" : "h1";
-    if (box) box.outerHTML = renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading);
-    bindRoster(roster, leagueAvail, tourneyAvail);
+    if (box) box.outerHTML = renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading, stats);
+    bindRoster(roster, leagueAvail, tourneyAvail, stats);
     if (window.bootVisuals) window.bootVisuals();
   };
   document.querySelectorAll("#roster-embed [data-pitcher]").forEach((btn) => {
@@ -561,7 +586,6 @@ function bindRoster(roster, leagueAvail, tourneyAvail) {
     });
   });
   bindPosEditor(document.getElementById("roster-embed"), roster, redraw);
-  bindLimitsEditor(document.getElementById("roster-embed"), roster, redraw);
   bindPhones(roster);
   if (typeof loadOffense === "function") loadOffense(roster);
 }
