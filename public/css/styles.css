@@ -308,6 +308,38 @@ a.hud:hover { border-color: var(--cyan); }
 .roster-row .num { text-align: center; font-variant-numeric: tabular-nums; }
 .roster-row .tag { margin-right: 0; justify-self: start; }
 .roster-row .muted { text-align: right; }
+.club-sort {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: inherit;
+  white-space: nowrap;
+  min-width: auto;
+}
+.roster-row .club-sort.num { text-align: center; }
+.roster-row .club-sort-team { text-align: left; justify-self: start; }
+.club-sort:hover { color: var(--cyan); }
+.club-sort.is-on { color: var(--cyan); }
+.club-sort.is-on::after {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 0.22em;
+  vertical-align: 0.12em;
+  border-left: 0.28em solid transparent;
+  border-right: 0.28em solid transparent;
+  border-top: 0.32em solid currentColor;
+}
+.club-sort.is-on.is-asc::after {
+  border-top: 0;
+  border-bottom: 0.32em solid currentColor;
+  vertical-align: 0.18em;
+}
 .roster-who {
   display: flex;
   align-items: baseline;
@@ -377,12 +409,19 @@ a.hud:hover { border-color: var(--cyan); }
 }
 button.roster-limits { cursor: pointer; }
 .diamond-card { padding: 0.9rem; }
-.diamond { position: relative; width: 100%; aspect-ratio: 1; max-height: 420px; }
+.diamond {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 1 / 1;
+  margin-inline: auto;
+}
 .diamond-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
 .spot {
   position: absolute;
   transform: translate(-50%, -50%);
   min-width: 96px;
+  max-width: 46%;
   white-space: nowrap;
   text-align: center;
   background: rgba(3, 6, 16, 0.82);
@@ -408,7 +447,17 @@ button.roster-limits { cursor: pointer; }
 .event time { font-family: var(--sport); color: var(--cyan); letter-spacing: 0.04em; font-size: 0.88rem; }
 .event h3 { margin: 0; font-size: 0.95rem; }
 .event p { margin: 0; font-size: 0.82rem; line-height: 1.35; }
-.event.played { opacity: 0.7; }
+.event.played { opacity: 0.92; }
+.game-box {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.game-box li { margin: 0.15rem 0; }
+.game-box b { color: var(--cyan); font-family: var(--display); margin-right: 0.25rem; }
 .kind { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--magenta); }
 
 .media-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -573,6 +622,22 @@ a.card { color: inherit; }
   text-align: left;
   line-height: 1.35;
 }
+.rating-how {
+  margin: 0.55rem 0 0;
+  max-width: 40rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.rating-how summary {
+  cursor: pointer;
+  color: var(--cyan);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+.rating-how p { margin: 0.4rem 0 0; }
+.rating-how ul { margin: 0.35rem 0 0; padding-left: 1.15rem; }
+.rating-how li { margin: 0.2rem 0; }
 .cal-cell {
   min-height: 78px; border: 1px solid var(--line); border-radius: 10px;
   padding: 0.28rem; background: rgba(5, 8, 20, 0.7);
@@ -598,6 +663,13 @@ a.cal-pill:hover { filter: brightness(1.2); }
 .cal-result.win { color: var(--go); }
 .cal-result.loss { color: #fb7185; }
 .cal-result.tie { color: var(--gold); }
+.cal-cell .cal-result {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.12rem 0 0;
+  white-space: nowrap;
+}
 .reveal { opacity: 0; transform: translateY(18px); animation: rise 0.7s ease forwards; }
 .reveal:nth-child(2) { animation-delay: 0.08s; }
 .reveal:nth-child(3) { animation-delay: 0.16s; }
@@ -619,6 +691,19 @@ a.cal-pill:hover { filter: brightness(1.2); }
   }
   .nav.open { display: flex; }
   .hero, .grid-3, .grid-2, .day-grid, .event, .week-edit .row, .feature-rail, .roster-layout { grid-template-columns: 1fr; }
+  .diamond {
+    max-width: none;
+    aspect-ratio: 2 / 3;
+  }
+  .spot {
+    width: 28%;
+    min-width: 0;
+    max-width: 30%;
+    white-space: nowrap;
+    padding: 0.1rem 0.28rem;
+  }
+  .spot b { font-size: 0.64rem; line-height: 1.2; }
+  .spot small { font-size: 0.55rem; letter-spacing: 0.08em; }
   .roster-row {
     grid-template-columns: 1.4rem auto minmax(0, 1fr);
     gap: 0.2rem 0.4rem;

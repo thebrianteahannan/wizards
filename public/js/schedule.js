@@ -1,3 +1,29 @@
+function gameErrLabel(g, kind) {
+  const us = g.eUs != null ? g.eUs : g.e;
+  const them = g.eThem;
+  if (us == null && them == null) return "";
+  if (kind === "short") return " E" + (us != null ? us : "—") + "/" + (them != null ? them : "—");
+  return "our E " + (us != null ? us : "—") + " · their E " + (them != null ? them : "—");
+}
+
+function eventGamesHtml(e) {
+  const rows = ((e && e.games) || []).filter((g) => g && (g.us != null || g.ab != null));
+  if (!rows.length) return "";
+  return `<ul class="game-box">${rows
+    .map((g, i) => {
+      const score = g.us != null ? `${g.mark || ""} ${g.us}-${g.them}`.trim() : "";
+      const opp = g.opp ? " vs " + escapeHtml(g.opp) : "";
+      const bits = [];
+      if (g.ab != null && g.ab !== "") bits.push("AB " + g.ab);
+      if (g.h != null && g.h !== "") bits.push("H " + g.h);
+      if (g.bb != null && g.bb !== "") bits.push("BB " + g.bb);
+      const err = gameErrLabel(g);
+      if (err) bits.push(err);
+      return `<li><b>G${g.n || i + 1}</b> ${escapeHtml(score)}${opp}${bits.length ? " · " + bits.map(escapeHtml).join(" · ") : ""}</li>`;
+    })
+    .join("")}</ul>`;
+}
+
 function eventKind(e) {
   if (e.kind === "open") return "league";
   if (e.kind === "practice") return "practice";
@@ -189,9 +215,26 @@ function calPillBits(e, packs) {
 function calDayTags(hits, packs) {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const seen = new Set();
   return hits
     .map((e) => {
       const rec = eventRecord(e);
+      if (e.games && e.games.some((g) => g && g.us != null)) {
+        return e.games
+          .map((g) => {
+            if (g.us == null) return "";
+            const key = g.id || g.n + ":" + g.us + "-" + g.them + ":" + g.opp;
+            if (seen.has(key)) return "";
+            seen.add(key);
+            const tone = g.mark === "W" ? "win" : g.mark === "L" ? "loss" : "tie";
+            const tip = [g.opp, g.ab != null ? "AB " + g.ab : "", g.h != null ? "H " + g.h : "", g.bb != null ? "BB " + g.bb : "", gameErrLabel(g)]
+              .filter(Boolean)
+              .join(" · ");
+            const ebit = gameErrLabel(g, "short");
+            return `<span class="tag cal-result ${tone}" title="${escapeHtml(tip)}">${escapeHtml((g.mark || "") + " " + g.us + "-" + g.them + ebit)}</span>`;
+          })
+          .join("");
+      }
       if (rec) {
         const tone = rec.mark === "W" ? "win" : rec.mark === "L" ? "loss" : "tie";
         return `<span class="tag cal-result ${tone}" title="${escapeHtml(e.when || rec.label)}">${escapeHtml(rec.label)}</span>`;

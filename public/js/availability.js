@@ -104,6 +104,16 @@ function offerKey(offer, kind) {
   return (offer && offer.day) || "";
 }
 
+function availFingerprint(avail) {
+  return JSON.stringify({
+    o: (avail.offers || []).map((x) => [x.date, x.note, x.times]),
+    p: avail.players,
+    s: avail.sit,
+    r: avail.order,
+    l: avail.lockedNight,
+  });
+}
+
 function adminRestChips(roster, avail, day, kind) {
   const tags = (roster.players || [])
     .filter((p) => {
@@ -531,6 +541,28 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     });
   }
   layoutDayCards();
+  window.availPollGen = (window.availPollGen || 0) + 1;
+  const pollGen = window.availPollGen;
+  if (window.availTimer) clearInterval(window.availTimer);
+  const stamp = availFingerprint(avail);
+  window.availTimer = setInterval(async () => {
+    if (pollGen !== window.availPollGen || !document.getElementById("avail-form")) {
+      clearInterval(window.availTimer);
+      return;
+    }
+    const typing = document.activeElement && document.activeElement.closest("#avail-form textarea, #opp-lineup textarea, #opp-lineup input");
+    const saving = (document.getElementById("avail-msg") || {}).textContent === "Saving…";
+    if (typing || saving) return;
+    try {
+      const [r, a] = await Promise.all([api.get("/api/roster"), loadMatchAvail(page.kind)]);
+      if (pollGen !== window.availPollGen) return;
+      if (availFingerprint(a) === stamp) return;
+      const dia = document.getElementById("avail-diamond");
+      const focusDay = dia && dia.dataset.day;
+      const focusDate = (focusDay && (document.querySelector('article.day[data-day="' + focusDay + '"]') || {}).dataset.date) || "";
+      await redraw(sessionPlayerId(r.players), true, focusDate);
+    } catch (_) {}
+  }, 30 * 60 * 1000);
 }
 
 if (!window.__availDaysResize) {

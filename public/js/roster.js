@@ -249,16 +249,22 @@ function pickPitcherId(players, kind) {
   return (arms[0] || players[0] || {}).id || "";
 }
 
+function diamondLabel(name) {
+  if (!window.matchMedia("(max-width: 900px)").matches) return name;
+  const parts = String(name || "").trim().split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : name;
+}
+
 function fieldLayout(players, pitcherId) {
   const FIELD = ["CF", "LF", "3B", "SS", "2B"];
   const IF_FIRST = ["3B", "SS", "2B", "CF", "LF"];
   const spots = [
-    { key: "CF", left: "50%", top: "10%" },
-    { key: "LF", left: "16%", top: "22%" },
-    { key: "3B", left: "18%", top: "48%" },
-    { key: "SS", left: "38%", top: "36%" },
-    { key: "2B", left: "72%", top: "32%" },
-    { key: "P", left: "50%", top: "58%" },
+    { key: "CF", left: "50%", top: "8%" },
+    { key: "LF", left: "18%", top: "20%" },
+    { key: "3B", left: "18%", top: "54%" },
+    { key: "SS", left: "42%", top: "36%" },
+    { key: "2B", left: "82%", top: "36%" },
+    { key: "P", left: "50%", top: "70%" },
   ];
   const pitcher = players.find((p) => p.id === pitcherId) || pitcherArms(players)[0];
   const extras = pitcherArms(players).filter((p) => !pitcher || p.id !== pitcher.id);
@@ -337,11 +343,11 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId, extraBench) {
           const mark = marks[p.id] || "";
           const cls = mark || (i ? "muted" : "");
           if (spot.key === "P") {
-            return `<b class="${cls}" data-pitcher="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(p.name)}</b>`;
+            return `<b class="${cls}" data-pitcher="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(diamondLabel(p.name))}</b>`;
           }
           return canEditPos()
-            ? `<b class="${cls}" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(p.name)}</b>`
-            : `<b class="${cls}">${escapeHtml(p.name)}</b>`;
+            ? `<b class="${cls}" data-edit-pos="${escapeHtml(p.id)}" style="cursor:pointer">${escapeHtml(diamondLabel(p.name))}</b>`
+            : `<b class="${cls}">${escapeHtml(diamondLabel(p.name))}</b>`;
         })
         .join("");
       return `<div class="spot${glow}" style="left:${spot.left};top:${spot.top}"><small>${spot.key}</small>${names}</div>`;
@@ -560,10 +566,8 @@ function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading, st
 function renderRoster(roster, leagueAvail, tourneyAvail, stats) {
   return `
     <p class="lede">One locked Wizards roster. Co-managers: Tony Kurtanick and Brian Hannan.</p>
-    ${isTeam() ? `<div class="actions" style="margin:0.7rem 0 0"><button class="btn ghost" type="button" id="show-phones">Phone numbers</button></div><div id="phone-list" class="card phone-list" hidden></div>` : ""}
     ${renderRosterEmbed(roster, leagueAvail, tourneyAvail, "dg-roster", "h1", stats)}
-    <div id="offense-host"></div>
-    <div id="pitching-host"></div>
+    <p class="muted" style="margin-top:1rem"><a href="#/stats">Hitting and pitching stats</a></p>
   `;
 }
 
@@ -610,7 +614,6 @@ function bindRoster(roster, leagueAvail, tourneyAvail, stats) {
     });
   });
   bindPosEditor(document.getElementById("roster-embed"), roster, redraw);
-  bindPhones(roster);
   const editBtn = document.getElementById("toggle-roster-edit");
   if (editBtn) {
     editBtn.addEventListener("click", () => {
@@ -620,5 +623,4 @@ function bindRoster(roster, leagueAvail, tourneyAvail, stats) {
       editBtn.textContent = rosterEditing ? "Hide statuses" : "Edit statuses";
     });
   }
-  if (typeof loadOffense === "function") loadOffense(roster);
 }

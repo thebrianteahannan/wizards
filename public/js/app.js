@@ -1,13 +1,13 @@
 const routes = {
   "/": "home",
   "/roster": "roster",
+  "/stats": "stats",
   "/schedule": "schedule",
   "/availability": "availability",
   "/tournament": "tournament",
   "/practice": "practice",
   "/activity": "activity",
   "/board": "board",
-  "/media": "media",
   "/gear": "gear",
   "/dues": "dues",
   "/admin": "admin",
@@ -58,6 +58,10 @@ async function load() {
       ]);
       app.innerHTML = renderRoster(roster, leagueAvail, tourneyAvail, stats);
       bindRoster(roster, leagueAvail, tourneyAvail, stats);
+    } else if (route === "stats") {
+      const roster = await api.get("/api/roster");
+      app.innerHTML = renderStats();
+      if (typeof loadOffense === "function") loadOffense(roster);
     } else if (route === "schedule") {
       const [schedule, leagueAvail, tourneyAvail, practiceAvail, book] = await Promise.all([
         api.get("/api/schedule"),
@@ -102,8 +106,6 @@ async function load() {
         app.innerHTML = renderBoard(roster, board, me);
         bindBoard(roster, !!me);
       }
-    } else if (route === "media") {
-      app.innerHTML = renderMedia();
     } else if (route === "gear") {
       if (!isTeam()) {
         app.innerHTML = renderLock("team");

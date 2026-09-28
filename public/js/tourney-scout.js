@@ -92,8 +92,8 @@ function renderTourneyScout(data, code, event) {
   const menu = scoutMenu(teams, pick ? pick.code : "overview");
   return `
     <p class="kicker">Locker room</p>
-    <h1>Tournament rankings</h1>
-    <p class="lede">${escapeHtml((data && data.note) || "Pick a tournament or use Overall.")} Clubs rank by record first. Grades stay on the board so we can see when they do not match the W-L. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+    <h1>Tournament Stats &amp; Analysis</h1>
+    <p class="lede">${escapeHtml((data && data.note) || "Pick a tournament or use Overall.")} Hitting is weighted by at-bats. Pitching is weighted by innings. Overall is 55% bats / 45% arms. Clubs rank by record first. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
     <div class="actions" data-tourney-events style="margin-top:0.7rem">${tourneyEventMenu(data)}</div>
     <div class="actions" data-scout-menu style="margin-top:0.55rem">${menu}</div>
     <div id="scout-pane" style="margin-top:1rem">${pick ? (recordPct(pick) >= 0 ? `<p class="muted" style="margin:0 0 0.45rem">${pick.w || 0}-${pick.l || 0}${pick.gp ? ` in ${pick.gp}` : ""} · RS ${pick.rs || 0} RA ${pick.ra || 0}${pick.rd != null ? ` (${pick.rd > 0 ? "+" : ""}${pick.rd})` : ""}${pick.streak ? " · " + pick.streak : ""}</p>` : "") + scoutPane(pick, pitFill, data && data.teams) : tourneyOverview(data)}</div>
@@ -116,6 +116,8 @@ const WIN_STAT = [
   ["pavg", "Opp AVG", -1],
   ["k9", "K/IP", 1],
   ["bb9", "BB/IP", -1],
+  ["fe", "FE", 1],
+  ["uer", "E", -1],
 ];
 
 const WIN_BLURB = {
@@ -133,6 +135,8 @@ const WIN_BLURB = {
   pavg: "Keeping hitters off the barrel tracks with winning.",
   k9: "Missing bats on the mound tracks with winning.",
   bb9: "Fewer walks issued track with winning.",
+  fe: "Reaching on errors (forced / fielding) tracks with winning.",
+  uer: "Fewer fielding errors per game track with winning.",
 };
 
 function wAvg(rows, key, wOf) {
@@ -179,6 +183,14 @@ function teamWinStats(team, marks) {
     pavg: wAvg(p, "avg", ip),
     k9: totRate(p, "so", ip),
     bb9: totRate(p, "bb", ip),
+    fe: totRate(b, "roe", tpa),
+    uer: (() => {
+      const g = Number(team.fieldG) || Number(team.gp) || (Number(team.w) || 0) + (Number(team.l) || 0);
+      if (team.fieldE != null && g) return team.fieldE / g;
+      const inn = (p || []).reduce((s, r) => s + (ip(r) || 0), 0);
+      const uer = Math.max(0, (p || []).reduce((s, r) => s + (scoutNum(r.r) || 0) - (scoutNum(r.er) || 0), 0));
+      return inn ? uer / inn : null;
+    })(),
   };
 }
 
@@ -237,26 +249,30 @@ function winHead(label, key, pack) {
 function winTrackHtml(teams, pack, kind) {
   const found = pack || winCorrelates(teams);
   const unit = kind === "history" ? "club-seasons" : "clubs";
-  if (found.n < 4) return "";
-  const drivers = found.hits.filter((h) => h.link >= 0.35).slice(0, 4);
+  const sheets = typeof clubSheetsHtml === "function" ? clubSheetsHtml(teams) : "";
+  if (found.n < 4) return sheets;
+  const top = found.hits.filter((h) => h.link >= 0.35).slice(0, 4);
+  const pinned = found.hits.filter((h) => (h.key === "fe" || h.key === "uer") && !top.some((x) => x.key === h.key));
+  const drivers = top.concat(pinned);
   if (!drivers.length) {
-    return `<p class="muted" style="margin:0.55rem 0 0">No stat clearly tracks with W-L yet across ${found.n} ${unit}.</p>`;
+    return `<p class="muted" style="margin:0.55rem 0 0">No stat clearly tracks with W-L yet across ${found.n} ${unit}.</p>${sheets}`;
   }
   const rows = drivers
     .map((h) => {
       const txt = (h.r >= 0 ? "+" : "−") + Math.abs(h.r).toFixed(2);
+      const tone = top.some((x) => x.key === h.key) ? "var(--go)" : "var(--cyan)";
       return `<div class="roster-row" style="grid-template-columns:4.6rem 3.2rem minmax(0,1fr)">
         <span class="tag">${escapeHtml(h.label)}</span>
-        <span class="num" style="color:var(--go)">${txt}</span>
-        <span class="muted">${escapeHtml(WIN_BLURB[h.key] || "Tracks with winning.")}</span>
+        <span class="num" style="color:${tone}">${txt}</span>
+        <span class="muted">${escapeHtml(h.key === "uer" && h.r >= 0 ? "Fielding errors vs win% in this sample." : WIN_BLURB[h.key] || "Tracks with winning.")}</span>
       </div>`;
     })
     .join("");
   return `<div style="margin-top:0.85rem">
     <p class="kicker" style="margin:0 0 0.35rem">What tracks with wins</p>
     <div class="roster-list">${rows}</div>
-    <p class="muted" style="margin:0.45rem 0 0">${escapeHtml(drivers[0].label)} is the strongest link to win% across ${found.n} ${unit} (Pearson r). Run differential is left off — it is wins in another form.</p>
-  </div>`;
+    <p class="muted" style="margin:0.45rem 0 0">${escapeHtml(drivers[0].label)} is the strongest link to win% across ${found.n} ${unit} (Pearson r). FE and E stay on this list even when they are not the top link. Run differential is left off — it is wins in another form.</p>
+  </div>${sheets}`;
 }
 
 function histHash(season) {
@@ -274,7 +290,7 @@ function renderHistoryScout(data) {
   const pack = winCorrelates(list);
   return `
     <p class="kicker">Locker room</p>
-    <h1>Tournament rankings</h1>
+    <h1>Tournament Stats &amp; Analysis</h1>
     <p class="lede">${escapeHtml((data && data.note) || "Previous PLW leagues.")} Same win-tracking as a tournament board, across past league seasons. <a href="${escapeHtml((data && data.source) || "https://www.mystatsonline.com/ballsports/visitor/league/stats/batter.aspx?IDLeague=61713")}" target="_blank" rel="noopener">MyStatsOnline</a></p>
     <div class="actions" data-tourney-events style="margin-top:0.7rem">${tourneyEventMenu(data)}</div>
     <div class="actions" data-hist-seasons style="margin-top:0.55rem">${chips}</div>
@@ -366,6 +382,7 @@ function bindTourneyScout(event) {
       location.hash = histHash(btn.dataset.histSeason);
     });
   });
+  if (typeof bindClubSheets === "function") bindClubSheets();
 }
 
 function tourneyGames(offer) {

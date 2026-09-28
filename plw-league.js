@@ -1,3 +1,4 @@
+const { fieldingTotals, applyFielding } = require("./plw-box");
 const LEAGUE = 61713;
 const SEASON = 110335;
 const TOURNEY = 110274;
@@ -18,6 +19,11 @@ const TEAM_NAMES = {
   STP: "Step Above",
   WIZ: "Wizards",
   TBD: "To Be Determined",
+  GUN: "Gunslingers",
+  WAR: "Warbirds",
+  LEV: "Leviathans",
+  SMG: "Smugglers",
+  PUF: "Pufferfish",
   BSD: "Balls Deep",
   CLS: "Cloud Seeders",
   KNU: "Knuckled Up",
@@ -238,12 +244,13 @@ function groupTeams(batters, pitchers) {
 
 async function getPlwLeagueBook(force) {
   if (!force && cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
-  const [batters, pitchers, standHtml] = await Promise.all([
+  const [batters, pitchers, standHtml, field] = await Promise.all([
     fetchTable(BATTER_URL, CELL_KEYS),
     fetchTable(PITCHER_URL, PITCH_KEYS),
     fetch(STANDINGS_BASE + SEASON, { headers: { "user-agent": "WizardsHub/1.0" } })
       .then((r) => r.text())
       .catch(() => ""),
+    fieldingTotals(SEASON, TEAM_NAMES, force).catch(() => ({})),
   ]);
   let teams = groupTeams(batters, pitchers);
   if (!teams.some((t) => t.code === "WIZ")) {
@@ -261,6 +268,7 @@ async function getPlwLeagueBook(force) {
   for (const t of teams) {
     if (byCode[t.code]) Object.assign(t, byCode[t.code]);
   }
+  applyFielding(teams, field);
   cache = {
     at: Date.now(),
     data: {
@@ -366,6 +374,7 @@ async function loadSeasonTeams(seasonId, force) {
     teams.unshift({ ...wiz, book: "tourney", note: "" });
   }
   applyStandings(teams, parseStandings(standHtml));
+  applyFielding(teams, await fieldingTotals(seasonId, TEAM_NAMES, force).catch(() => ({})));
   seasonBooks[seasonId] = { at: Date.now(), teams };
   return teams;
 }
@@ -387,6 +396,7 @@ async function getPlwTourneyBook(eventId, force) {
       if (rec[t.code]) Object.assign(t, rec[t.code]);
     }
     applyStandings(teams, Object.values(rec));
+    applyFielding(teams, await fieldingTotals(TOURNEY, TEAM_NAMES, force).catch(() => ({})));
     season = TOURNEY;
     note = "Tally of every posted tournament, ranked by W-L. Pick an event for that day’s board.";
   } else if (ev && ev.season) {

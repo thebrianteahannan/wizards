@@ -168,6 +168,17 @@ function renderOffense(roster, stats, customIds, mode) {
       <p class="kicker">Offense</p>
       <h2 style="margin:0 0 0.35rem">${lineup ? "Batting order" : "Hitting"}</h2>
       <p class="muted">${escapeHtml((stats && stats.note) || "League, tourney, and combined averages from PLW.")} ${blurb} Hit rating uses the combined line. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+      <details class="rating-how">
+        <summary>How hit rating is calculated</summary>
+        <p>The number next to each name is 1–99 from the combined Total line. Needs at least one plate appearance.</p>
+        <ul>
+          <li>38% on-base percentage</li>
+          <li>32% slugging</li>
+          <li>15% batting average</li>
+          <li>15% walks minus strikeouts per plate appearance (capped so one wild line cannot swing the whole score)</li>
+        </ul>
+        <p>That mix is scaled up and clipped to 1–99. 70 and up is green, 50–69 is gold.</p>
+      </details>
       <div class="roster-list" style="margin-top:0.6rem">${rows}</div>
       ${admin ? '<p class="muted" id="bat-msg" style="margin:0.45rem 0 0">↑ ↓ saves the order.</p>' : ""}
     </div>`;

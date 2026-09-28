@@ -250,6 +250,8 @@ function renderAdmin(roster, fees) {
     <p class="kicker">Site admin</p>
     <h1>Admin</h1>
     <p class="lede">Switch how the ${money(fees.teamTotal || 250)} team fee is split. Players see the result on <a href="#/dues">Dues</a>.</p>
+    <div class="actions" style="margin:0.7rem 0 0"><button class="btn ghost" type="button" id="show-phones">Phone numbers</button></div>
+    <div id="phone-list" class="card phone-list" hidden></div>
     <section class="card">
       <details>
         <summary style="cursor:pointer">Fee model</summary>
@@ -307,6 +309,7 @@ function renderAdmin(roster, fees) {
 }
 
 function bindAdmin(roster) {
+  if (typeof bindPhones === "function") bindPhones(roster);
   const form = document.getElementById("fees-form");
   if (!form) return;
   form.addEventListener("submit", async (e) => {

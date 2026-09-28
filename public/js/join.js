@@ -24,7 +24,7 @@ function recruitCoreFields(r, opts) {
         </div>
         <div class="grid-2">
           <div class="form-row">
-            <label>Phone</label>
+            <label>Phone (optional)</label>
             <input name="phone" type="tel" ${phoneReq} maxlength="32" autocomplete="tel" value="${attr(r.phone)}" />
           </div>
           <div class="form-row">
@@ -72,7 +72,7 @@ function renderJoin() {
       : "This fall is practice and tryouts. We are building a Wizards club for the Real League in January 2027. Co-managers review every form."}</p>
     <section class="card" style="max-width:40rem">
       <form id="join-form">
-        ${recruitCoreFields({}, { phoneRequired: true })}
+        ${recruitCoreFields({}, { phoneRequired: false })}
         ${team ? `<div class="form-row">
             <label>Notes (optional)</label>
             <textarea name="notes" rows="3" maxlength="800" placeholder="How you know them, when they can play, anything else"></textarea>

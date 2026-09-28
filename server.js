@@ -130,24 +130,27 @@ async function logAvailability(player, kind, prevDays, nextDays, keys) {
 
 app.get("/api/availability", async (req, res) => {
   const kind = availKind(req);
-  let avail = await readJson(AVAIL_FILES[kind]);
   if (kind === "league") {
     try {
-      const beforeOffers = JSON.stringify(avail.offers || []);
-      const synced = await syncLeagueOffers(avail, { refresh: req.query.refresh === "1" });
-      if (!synced.error) {
-        const latest = await readJson("availability.json");
-        latest.offers = synced.avail.offers;
-        const migrated = migrateWeekdayAnswers(latest);
-        avail = migrated.avail;
-        if (JSON.stringify(avail.offers || []) !== beforeOffers || migrated.changed) {
-          await writeJson("availability.json", avail);
-        }
-      }
+      return res.json(await pullLeagueCalendar(req.query.refresh === "1"));
     } catch (_) {}
   }
-  res.json(avail);
+  res.json(await readJson(AVAIL_FILES[kind]));
 });
+
+async function pullLeagueCalendar(force) {
+  const avail = await readJson("availability.json");
+  const beforeOffers = JSON.stringify(avail.offers || []);
+  const synced = await syncLeagueOffers(avail, { refresh: !!force });
+  if (synced.error) return avail;
+  const latest = await readJson("availability.json");
+  latest.offers = synced.avail.offers;
+  const migrated = migrateWeekdayAnswers(latest);
+  if (JSON.stringify(migrated.avail.offers || []) !== beforeOffers || migrated.changed) {
+    await writeJson("availability.json", migrated.avail);
+  }
+  return migrated.avail;
+}
 
 function migrateWeekdayAnswers(avail) {
   const weekdays = new Set(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]);
@@ -525,7 +528,7 @@ app.get("/api/recruits", requireTeam, async (_req, res) => {
 });
 
 app.post("/api/recruits", async (req, res) => {
-  const parsed = parseRecruit(req.body, true);
+  const parsed = parseRecruit(req.body, false);
   if (parsed.error) return res.status(400).json({ error: parsed.error });
   const data = await readJson("recruits.json");
   const key = recruitDupKey(parsed.value);
@@ -661,6 +664,8 @@ init()
     });
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Wizards hub running at http://localhost:${PORT}`);
+      pullLeagueCalendar(true).catch(() => {});
+      setInterval(() => pullLeagueCalendar(false).catch(() => {}), 30 * 60 * 1000);
     });
   })
   .catch((err) => {

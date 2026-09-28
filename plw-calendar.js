@@ -1,3 +1,5 @@
+const { attachGameLines, foldSameDay } = require("./plw-box");
+
 const LEAGUE = 61713;
 const CAL_URL =
   "https://www.mystatsonline.com/ballsports/visitor/league/schedule_scores/calendar.aspx?IDLeague=" + LEAGUE;
@@ -58,6 +60,8 @@ const MONTH_ABBR = {
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 let cache = { at: 0, nights: null, error: "" };
+let inflight = null;
+const CACHE_MS = 30 * 60 * 1000;
 
 function todayStamp() {
   const d = new Date();
@@ -80,6 +84,45 @@ function isClock(status) {
 
 function isScore(status) {
   return /^\d+\s*-\s*\d+$/.test(String(status || "").trim());
+}
+
+function realTeam(code) {
+  return code && code !== "TBD";
+}
+
+function isWizGame(g) {
+  return g && (g.away === "WIZ" || g.home === "WIZ");
+}
+
+function isPlaceholderHome(code) {
+  return code === "TBD" || code === "SVG";
+}
+
+function isOpenSlot(g) {
+  if (!g || isWizGame(g)) return false;
+  if (g.home === "TBD" && realTeam(g.away)) return true;
+  if (g.away === "TBD" && realTeam(g.home) && g.home !== "SVG") return true;
+  return g.home === "SVG" && realTeam(g.away) && g.away !== "SVG";
+}
+
+function plwWeeknight(date) {
+  const d = new Date(date + "T12:00:00").getDay();
+  return d >= 1 && d <= 5;
+}
+
+const OPEN_SLOTS = ["6:35 PM", "7:25 PM", "8:15 PM"];
+
+function keepGamesForOffers(games) {
+  const filled = new Set(
+    (games || [])
+      .filter((g) => realTeam(g.away) && realTeam(g.home) && !isPlaceholderHome(g.home) && g.away !== "TBD")
+      .map((g) => String(g.time || ""))
+  );
+  return (games || []).filter((g) => {
+    if (isWizGame(g)) return true;
+    if (!isOpenSlot(g)) return false;
+    return !filled.has(String(g.time || ""));
+  });
 }
 
 function parseScorePair(status) {
@@ -186,18 +229,25 @@ function parseMonthNights(html) {
     }
     const date = y + "-" + String(mo + 1).padStart(2, "0") + "-" + String(dayNum).padStart(2, "0");
     const gameRe =
-      /cal-game-away-abbr[^>]*>([^<]+)<[\s\S]*?game_score_ball\(\d+\)'>([^<]+)<[\s\S]*?cal-game-home-abbr[^>]*>([^<]+)</g;
+      /cal-game-away-abbr[^>]*>([^<]+)<[\s\S]*?game_score_ball\((\d+)\)'>([^<]+)<[\s\S]*?cal-game-home-abbr[^>]*>([^<]+)</g;
+    const games = [];
     let g;
     while ((g = gameRe.exec(chunk))) {
       const away = g[1].trim();
-      const status = g[2].trim();
-      const home = g[3].trim();
+      const gid = g[2];
+      const status = g[3].trim();
+      const home = g[4].trim();
       if (!isClock(status) && !isScore(status)) continue;
-      if (![away, home].some((t) => t === "WIZ" || t === "TBD")) continue;
       const time = isClock(status) ? normalizeTime(status) : String(status).trim();
       if (!time) continue;
+      games.push({ away, home, time, id: gid });
+    }
+    if (games.length) {
       const row = byDate[date] || (byDate[date] = { date, games: [] });
-      row.games.push({ away, home, time });
+      row.games.push(...games);
+      delete row.openField;
+    } else if (kind !== "cal-date-other" && plwWeeknight(date) && !byDate[date]) {
+      byDate[date] = { date, games: [], openField: true };
     }
   }
   return Object.values(byDate);
@@ -225,20 +275,32 @@ function formatTimes(times) {
 }
 
 function offerFromNight(night) {
-  const games = night.games || [];
-  const times = sortTimes(games.map((g) => g.time));
-  const wiz = games.find((g) => g.away === "WIZ" || g.home === "WIZ");
+  const games = keepGamesForOffers(night.games || []);
+  const weekday = WEEKDAYS[new Date(night.date + "T12:00:00").getDay()];
+  if (!games.length) {
+    if (!night.openField) return null;
+    return {
+      date: night.date,
+      day: weekday,
+      note: "Open · " + OPEN_SLOTS.join(" / "),
+      times: OPEN_SLOTS.slice(),
+      source: "mystats",
+    };
+  }
+  const times = sortTimes(games.map((g) => g.time).filter(isClock));
+  const wiz = games.find(isWizGame);
   let note;
   if (wiz) {
     const them = wiz.away === "WIZ" ? wiz.home : wiz.away;
-    note = "vs " + teamName(them);
+    note = realTeam(them) ? "vs " + teamName(them) : "Opponent TBD";
   } else {
-    const open = games.find((g) => g.away === "TBD" || g.home === "TBD") || games[0];
-    const them = open.away === "TBD" ? open.home : open.away;
+    const open = games.find(isOpenSlot);
+    if (!open) return null;
+    const them = isPlaceholderHome(open.home) ? open.away : open.home;
+    if (!realTeam(them) || them === "SVG") return null;
     note = "Open · vs " + teamName(them);
   }
   if (times.length) note += " · " + times.join(" / ");
-  const weekday = WEEKDAYS[new Date(night.date + "T12:00:00").getDay()];
   return {
     date: night.date,
     day: weekday,
@@ -294,12 +356,13 @@ function parseSlickNights(html) {
     const games = [];
     for (const card of block.split(/id="bannerGames_rptGame_pnlGame_\d+"/).slice(1)) {
       const labs = [...card.matchAll(/slick-game-label-abbr[^>]*>([^<]+)/g)].map((m) => m[1].trim());
-      if (labs.length < 2 || ![labs[0], labs[1]].some((t) => t === "WIZ" || t === "TBD")) continue;
+      if (labs.length < 2 || ![labs[0], labs[1]].some((t) => t === "WIZ")) continue;
       const scores = [...card.matchAll(/slick-game-score[^>]*>([^<]*)/g)].map((m) => m[1].trim()).filter(Boolean);
       const clock = normalizeTime((card.match(/slick-game-state[^>]*>\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i) || [])[1] || "");
       const time = scores.length >= 2 ? scores[0] + " - " + scores[1] : clock;
       if (!time || time === "11:11 AM") continue;
-      games.push({ away: labs[0], home: labs[1], time });
+      const gid = (card.match(/IDGame=(\d+)/) || [])[1] || "";
+      games.push({ away: labs[0], home: labs[1], time, id: gid });
     }
     if (games.length) nights.push({ date, games });
   }
@@ -307,18 +370,28 @@ function parseSlickNights(html) {
 }
 
 async function loadCalendarNights(force) {
-  if (!force && cache.nights && Date.now() - cache.at < 10 * 60 * 1000) return cache.nights;
-  const first = await fetchHtml(CAL_URL);
-  const nights = parseMonthNights(first);
-  try { mergeNights(nights, await fetchPostedMonth(first, prevMonthArg(first))); } catch (_) {}
-  try { mergeNights(nights, await fetchPostedMonth(first, nextMonthArg(first))); } catch (_) {}
-  try {
-    const pages = await Promise.all(FCL_TEAMS.map((id) => fetchHtml(teamPage(id)).catch(() => "")));
-    for (const html of pages) mergeNights(nights, parseSlickNights(html));
-  } catch (_) {}
-  nights.sort((a, b) => a.date.localeCompare(b.date));
-  cache = { at: Date.now(), nights, error: "" };
-  return nights;
+  if (!force && cache.nights && Date.now() - cache.at < CACHE_MS) return cache.nights;
+  if (inflight) return inflight;
+  inflight = (async () => {
+    const first = await fetchHtml(CAL_URL);
+    const nights = parseMonthNights(first);
+    try { mergeNights(nights, await fetchPostedMonth(first, prevMonthArg(first))); } catch (_) {}
+    try { mergeNights(nights, await fetchPostedMonth(first, nextMonthArg(first))); } catch (_) {}
+    nights.sort((a, b) => a.date.localeCompare(b.date));
+    const kept = nights
+      .map((n) => {
+        const games = keepGamesForOffers(n.games || []);
+        if (games.length) return { date: n.date, games };
+        if (n.openField && !(n.games || []).length) return { date: n.date, games: [], openField: true };
+        return { date: n.date, games: [] };
+      })
+      .filter((n) => (n.games || []).length || n.openField);
+    cache = { at: Date.now(), nights: kept, error: "" };
+    return kept;
+  })().finally(() => {
+    inflight = null;
+  });
+  return inflight;
 }
 
 async function syncLeagueOffers(avail, opts) {
@@ -332,8 +405,9 @@ async function syncLeagueOffers(avail, opts) {
   }
   const today = todayStamp();
   const nextOffers = nights
-    .filter((n) => n.date >= today && (n.games || []).some((g) => isClock(g.time)))
-    .map(offerFromNight);
+    .filter((n) => n.date >= today && ((n.games || []).some((g) => isClock(g.time)) || n.openField))
+    .map(offerFromNight)
+    .filter(Boolean);
   const keep = (avail.offers || []).filter(
     (o) => o && o.source !== "mystats" && (!o.date || o.date >= today)
   );
@@ -382,6 +456,17 @@ function eventFromWizNight(night) {
     status: played ? "played" : "upcoming",
     detail: played ? "Final on the PLW calendar." : "Locked on the PLW MyStats calendar.",
     source: "mystats",
+    games: games.map((g, i) => {
+      const o = wizGameOutcome(g) || {};
+      return {
+        n: i + 1,
+        opp: teamName(g.away === "WIZ" ? g.home : g.away),
+        id: g.id || "",
+        us: o.us,
+        them: o.them,
+        mark: o.mark || "",
+      };
+    }),
   };
   if (played && outcomes.length) {
     ev.wins = wins;
@@ -404,7 +489,8 @@ function sameEvent(a, b) {
     a.losses === b.losses &&
     a.ties === b.ties &&
     a.result === b.result &&
-    a.record === b.record
+    a.record === b.record &&
+    JSON.stringify(a.games || []) === JSON.stringify(b.games || [])
   );
 }
 
@@ -440,20 +526,24 @@ async function syncScheduleEvents(schedule, opts) {
       }
       continue;
     }
-    const j = kept.findIndex((e) => e && e.date === ev.date && e.kind === "league");
+    const j = kept.findIndex((e) => e && e.date === ev.date);
     if (j >= 0) {
+      const cur = kept[j];
+      const keepName = cur.kind === "tournament" || cur.kind === "special";
       const merged = {
-        ...kept[j],
-        title: ev.title,
-        when: ev.when,
-        status: ev.status,
-        detail: ev.detail,
-        source: "mystats",
+        ...cur,
+        title: keepName ? cur.title : ev.title,
+        kind: keepName ? cur.kind : ev.kind,
+        when: ev.when || cur.when,
+        status: ev.status || cur.status,
+        detail: keepName ? cur.detail : ev.detail,
+        source: ev.source || cur.source,
         wins: ev.wins,
         losses: ev.losses,
         ties: ev.ties,
         result: ev.result,
         record: ev.record,
+        games: ev.games || cur.games,
       };
       if (!sameEvent(kept[j], merged)) {
         kept[j] = merged;
@@ -465,7 +555,13 @@ async function syncScheduleEvents(schedule, opts) {
     }
   }
   kept.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
-  return { schedule: { ...schedule, events: kept }, changed, error: "" };
+  const folded = foldSameDay(kept);
+  if (folded.changed) changed = true;
+  const events = folded.events;
+  try {
+    if (await attachGameLines(events, nights)) changed = true;
+  } catch (_) {}
+  return { schedule: { ...schedule, events }, changed, error: "" };
 }
 
 module.exports = { syncLeagueOffers, syncScheduleEvents, loadCalendarNights, CAL_URL };

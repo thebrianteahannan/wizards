@@ -130,6 +130,17 @@ function renderPitching(roster, stats, customIds) {
       <p class="kicker">Pitching</p>
       <h2 style="margin:0 0 0.35rem">Rotation</h2>
       <p class="muted">${escapeHtml((stats && stats.pitchNote) || "Pitching from PLW.")} Ace is the best pitch rating (ERA, WHIP, strikeouts, walks). <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+      <details class="rating-how">
+        <summary>How pitch rating is calculated</summary>
+        <p>The number next to each name is 1–99. Needs innings pitched.</p>
+        <ul>
+          <li>35% ERA (lower is better; a 10.00 ERA scores nothing on this piece)</li>
+          <li>30% WHIP (a 3.00 WHIP scores nothing on this piece)</li>
+          <li>20% strikeouts per inning (capped at 3 K per inning)</li>
+          <li>15% walk rate (3 walks per inning scores nothing on this piece)</li>
+        </ul>
+        <p>That mix is scaled to 1–99. 70 and up is green, 50–69 is gold.</p>
+      </details>
       <div class="roster-list" style="margin-top:0.6rem">${rows || '<p class="muted">No pitchers on the book.</p>'}</div>
       ${admin ? '<p class="muted" id="pit-msg" style="margin:0.45rem 0 0">↑ ↓ saves the rotation.</p>' : ""}
     </div>`;

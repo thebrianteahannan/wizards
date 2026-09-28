@@ -98,10 +98,19 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail, stats) {
         <div class="actions">
           <a class="btn ghost" href="#/league">Watch stream</a>
           ${team ? `<a class="btn ghost" href="#/strategy">Strategy</a>` : ""}
-          <a class="btn ghost" href="#/media">Gallery</a>
         </div>
       </article>
     </section>
+  `;
+}
+
+function renderStats() {
+  return `
+    <p class="kicker">PLW box</p>
+    <h1>Stats</h1>
+    <p class="lede">League, tourney, and combined hitting and pitching for the locked Wizards roster.</p>
+    <div id="offense-host"></div>
+    <div id="pitching-host"></div>
   `;
 }
 
@@ -123,7 +132,10 @@ function renderSchedule(schedule, avail, view, monthKey, packs) {
           <div class="kind">${escapeHtml(e.kind)} · ${escapeHtml(e.status)}${typeof eventRecord === "function" && eventRecord(e) ? " · " + escapeHtml(eventRecord(e).label) : ""}</div>
           <h3>${escapeHtml(e.title)}</h3>
           ${typeof schedFavorHtml === "function" ? schedFavorHtml(e, packs && packs.book) : ""}
-          <p>${escapeHtml(e.when)}${e.detail ? ` <span class="muted">· ${escapeHtml(e.detail)}</span>` : ""}${e.link ? ` · <a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch</a>` : ""}</p>
+          ${typeof eventGamesHtml === "function" ? eventGamesHtml(e) : ""}
+          ${e.games && e.games.some((g) => g && g.us != null)
+            ? (e.link ? `<p><a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch</a></p>` : "")
+            : `<p>${escapeHtml(e.when)}${e.detail ? ` <span class="muted">· ${escapeHtml(e.detail)}</span>` : ""}${e.link ? ` · <a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">Watch</a>` : ""}</p>`}
         </div>
       </article>`)
     .join("");
@@ -138,38 +150,6 @@ function renderSchedule(schedule, avail, view, monthKey, packs) {
     <p class="lede">${isTeam() ? `Wizards games and open PLW nights. The number is who said yes — tap a night to mark yourself. Recurring weeknight is chosen on <a href="#/availability">Match days</a> once six overlap.` : "Tournaments, league dates, and open PLW nights we could still take."}</p>
     ${isTeam() ? lock : ""}
     ${view === "calendar" ? renderCalendarMonth(events, monthKey, packs) : `<div class="timeline" style="margin-top:1rem">${list}</div>`}
-  `;
-}
-
-function renderMedia() {
-  const shots = [
-    ["jersey-mockup.jpg", "Pinstripe Wizard alternate jersey — front and back."],
-    ["jerseys-box.jpg", "Kits in the box: wizard crest, stars, wiffle ball."],
-    ["batting-stance.jpg", "In the box, yellow bat, white PVC fence."],
-    ["batting-followthrough.jpg", "Swing through. Prodigy on the back."],
-    ["pitching-windup.jpg", "Windup from the rubber."],
-    ["pitching-set.jpg", "Set position, ball in hand."],
-    ["strike-zone.jpg", "K-zone / Blitzball target for backyard work."],
-    ["backstop-frame.jpg", "DIY PVC frame going up."],
-    ["turf-shoes.jpg", "Approved 3n2 MOFO turf shoe."],
-    ["league-texts.png", "PLW opening notes and team texts."],
-  ];
-  const figs = shots
-    .map(
-      ([src, cap]) => `
-      <a href="/media/${src}" target="_blank" rel="noopener">
-        <figure>
-          <img src="/media/${src}" alt="${escapeHtml(cap)}" />
-          <figcaption>${escapeHtml(cap)}</figcaption>
-        </figure>
-      </a>`
-    )
-    .join("");
-  return `
-    <p class="kicker">Gallery</p>
-    <h1>Media</h1>
-    <p class="lede">Jerseys, the ranch, backyard K-zone, and the road to Brooksville.</p>
-    <div class="media-grid" style="margin-top:1rem">${figs}</div>
   `;
 }
 
@@ -290,6 +270,14 @@ function renderLeague() {
         · <a href="https://premierleaguewiffle.com/basic-rules/" target="_blank" rel="noopener">Basic rules</a>
         · <a href="https://premierleaguewiffle.com/player-code-of-conduct/" target="_blank" rel="noopener">Code of conduct</a>
       </p>
+    </section>
+    <section class="card" style="margin-top:1rem">
+      <h2>The field</h2>
+      <ul class="rules">
+        <li>Strike zone: 24.5" wide × 28.5" tall, standing 11" off the ground</li>
+        <li>Mound to the plate (K-zone): 43.5 feet</li>
+        <li>Home-run wall: 90–105 feet down the lines, 115–125 to center</li>
+      </ul>
     </section>
     <section class="card" style="margin-top:1rem">
       <h2>PLW live streaming</h2>
@@ -413,24 +401,17 @@ function latestAnnounceTag(board) {
 
 function renderTeamHub(favTag, tourneyTag, pracTag, rankTag, tRankTag, recruitTag, queueTag, announceTag) {
   const cards = [
-    ["#/board", "◉", "Announcements", "Board notes for the club.", announceTag],
     ["#/availability", "◷", "Match days", "League nights and tournaments. Need 6 yes at the same time.", ["Set your days", favTag, tourneyTag].filter(Boolean)],
-    ["#/scout", "▦", "League rankings", "Overview and every Challengers club.", rankTag],
-    ["#/tourney-scout", "▣", "Tournament rankings", "Each event, plus an overall tally.", tRankTag],
-    ["#/practice", "◎", "Practice", "Post a session. Tap yes, maybe, or no.", pracTag],
-    ["#/gear", "✦", "Gear", "Jersey number and size."],
+    ["#/scout", "▦", "League Stats & Analysis", "Overview and every Challengers club.", rankTag],
+    ["#/tourney-scout", "▣", "Tournament Stats & Analysis", "Each event, plus hitting and pitching by club.", tRankTag],
     ["#/join", "+", "Recruit", "Put someone in the book.", recruitTag],
     ["#/recruits", "☰", "Recruits", "Inbox, contact, move onto the roster.", queueTag],
     ["#/dues", "$", "Dues", "Who paid and what they owe."],
     ["#/strategy", "◈", "Strategy", "Team-only talk."],
   ]
     .map(([href, icon, title, blurb, tag]) => {
-      const wrap = title === "Announcements";
       const tags = (Array.isArray(tag) ? tag : tag ? [tag] : [])
-        .map(
-          (t) =>
-            `<span class="tag"${wrap ? ' style="display:block;white-space:normal;text-transform:none;letter-spacing:0.03em;line-height:1.4;max-width:100%"' : ""}>${escapeHtml(t)}</span>`
-        )
+        .map((t) => `<span class="tag">${escapeHtml(t)}</span>`)
         .join("");
       return `
       <a class="card feature" href="${href}">
@@ -444,7 +425,7 @@ function renderTeamHub(favTag, tourneyTag, pracTag, rankTag, tRankTag, recruitTa
   return `
     <p class="kicker">Locker room</p>
     <h1>Private Team</h1>
-    <p class="lede">Match days, practice, gear, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
+    <p class="lede">Match days, recruiting, dues, and strategy. Public pages stay in the main menu.</p>
     <section class="grid-3" style="margin-top:1.2rem">${cards}</section>
   `;
 }

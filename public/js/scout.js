@@ -183,7 +183,7 @@ function renderScout(data, code) {
   const menu = scoutMenu(teams, pick ? pick.code : "overview");
   return `
     <p class="kicker">Locker room</p>
-    <h1>League rankings</h1>
+    <h1>League Stats &amp; Analysis</h1>
     <p class="lede">${escapeHtml((data && data.note) || "Florida Challengers League stats by team.")} Hitting is weighted by at-bats. Pitching is weighted by innings. Overall is 55% bats / 45% arms. * Wizards: tourney bats and arms. <a href="#/tourney-scout?event=historical">Historical leagues</a>. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
     <div class="actions" data-scout-menu style="margin-top:0.7rem">${menu}</div>
     <div id="scout-pane" style="margin-top:1rem">${pick ? scoutPane(pick, pitFill, data && data.teams) : overviewPane(data)}</div>
@@ -198,6 +198,7 @@ function bindScout() {
       location.hash = code === "overview" ? "#/scout" : "#/scout?team=" + encodeURIComponent(code);
     });
   });
+  if (typeof bindClubSheets === "function") bindClubSheets();
 }
 
 function weightedScore(rows, scoreOf, weightOf) {
