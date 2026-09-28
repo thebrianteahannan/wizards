@@ -104,27 +104,6 @@ function offerKey(offer, kind) {
   return (offer && offer.day) || "";
 }
 
-function slugTime(label) {
-  return "t-" + String(label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24);
-}
-
-function parseOfferTimes(note) {
-  const text = String(note || "");
-  const colon = [...text.matchAll(/\b(\d{1,2}:\d{2})\b/g)].map((m) => m[1]);
-  if (colon.length) {
-    const ampm = (text.match(/\b(AM|PM)\b/i) || [])[1];
-    const suf = ampm ? " " + ampm.toUpperCase() : "";
-    return [...new Set(colon.map((t) => t + suf))];
-  }
-  return [...new Set([...text.matchAll(/\b(\d{1,2}(?::\d{2})?)\s*(am|pm)\b/gi)].map((m) => m[1] + m[2].toLowerCase()))];
-}
-
-function windowsForOffer(offer, fallback) {
-  const times = (offer.times && offer.times.length ? offer.times : parseOfferTimes(offer.note)).filter(Boolean);
-  if (!times.length) return fallback || [];
-  return times.map((label) => ({ id: slugTime(label), label, hint: label }));
-}
-
 function adminRestChips(roster, avail, day, kind) {
   const tags = (roster.players || [])
     .filter((p) => {
@@ -141,13 +120,10 @@ function chipName(n) {
   return n && n.name != null ? n.name : String(n || "");
 }
 
-function availChips(slot, dayAll) {
-  const inSlot = new Set([...(slot.yes || []), ...(slot.maybe || [])].map(chipName));
+function availChips(names) {
   return [
-    ...(slot.yes || []).map((n) => `<span class="chip yes"${n && n.id ? ` data-admin-drop="${escapeHtml(n.id)}" style="cursor:pointer"` : ""}>${escapeHtml(chipName(n))}</span>`),
-    ...(slot.maybe || []).map((n) => `<span class="chip maybe">${escapeHtml(chipName(n))}?</span>`),
-    ...(dayAll.yes || []).filter((n) => !inSlot.has(chipName(n))).map((n) => `<span class="chip">${escapeHtml(chipName(n))}</span>`),
-    ...(dayAll.maybe || []).filter((n) => !inSlot.has(chipName(n))).map((n) => `<span class="chip">${escapeHtml(chipName(n))}?</span>`),
+    ...(names.yes || []).map((n) => `<span class="chip yes"${n && n.id ? ` data-admin-drop="${escapeHtml(n.id)}" style="cursor:pointer"` : ""}>${escapeHtml(chipName(n))}</span>`),
+    ...(names.maybe || []).map((n) => `<span class="chip maybe">${escapeHtml(chipName(n))}?</span>`),
   ].join("");
 }
 
@@ -195,28 +171,17 @@ async function renderAvailability(roster, avail, playerId, kind) {
     const num = ok ? when.getDate() : "";
     const mon = ok ? when.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : "";
     const entry = mine[day] || { status: "no", windows: [] };
-    const dayWindows = windowsForOffer(offer, avail.windows || []);
-    const byWindow = dayWindows.map((w) => ({ w, t: tallySlot(avail, day, w.id) }));
-    const best = byWindow.reduce((a, b) => (b.t.yes > a.t.yes ? b : a), byWindow[0] || { t: { yes: 0, maybe: 0, names: { yes: [], maybe: [] } } });
-    const go = best.t.yes >= needed;
-    const close = !go && best.t.yes + best.t.maybe >= needed;
-    const chips = availChips(best.t ? best.t.names : { yes: [], maybe: [] }, tallySlot(avail, day).names);
-    const counts = byWindow
-      .map((row) => {
-        const on = best.w && row.w.id === best.w.id ? "on" : "";
-        return `<span class="win-count ${on} ${row.t.yes >= needed ? "go" : ""}" data-window="${escapeHtml(row.w.id)}">${escapeHtml(/^t-/.test(row.w.id) ? row.w.hint : row.w.label[0])}<b>${row.t.yes}</b>${row.t.maybe ? `<i>+${row.t.maybe}</i>` : ""}</span>`;
-      })
-      .join("");
+    const night = tallySlot(avail, day);
+    const go = night.yes >= needed;
+    const close = !go && night.yes + night.maybe >= needed;
+    const chips = availChips(night.names);
     const segs = ["yes", "maybe", "no"]
       .map((s) => `<label class="${entry.status === s ? "on" : ""}"><input type="radio" name="st-${day}" value="${s}" ${entry.status === s ? "checked" : ""}/> ${cap(s)}</label>`)
-      .join("");
-    const wins = dayWindows
-      .map((w) => `<label><input type="checkbox" name="w-${day}" value="${w.id}" ${entry.windows.includes(w.id) ? "checked" : ""}/> ${escapeHtml(w.hint)}</label>`)
       .join("");
     const src = offer.source || page.kind;
     const lockBtn =
       isManager && go
-        ? `<button class="btn" data-lock="${day}" data-window="${best.w.id}" data-kind="${escapeHtml(src)}" type="button">Lock</button>`
+        ? `<button class="btn" data-lock="${day}" data-window="night" data-kind="${escapeHtml(src)}" type="button">Lock</button>`
         : "";
     const fav = src !== "practice" && typeof matchupFavor === "function" ? matchupFavor(offer, book) : null;
     const favHtml =
@@ -227,9 +192,8 @@ async function renderAvailability(roster, avail, playerId, kind) {
       <article class="day ${go ? "go" : close ? "close" : ""}" data-day="${day}" data-date="${escapeHtml(offer.date || "")}" data-kind="${escapeHtml(src)}" style="cursor:pointer">
         <h3>${num ? `<span class="day-num" style="font-family:var(--sport);letter-spacing:0.06em">${escapeHtml(mon)} ${num}</span>` : ""}${label}${favHtml}</h3>
         <p class="day-note">${escapeHtml(offer.note)}</p>
-        <div class="win-line">${counts}</div>
+        <div class="win-line"><span class="win-count on ${go ? "go" : ""}"><b>${night.yes}</b>${night.maybe ? `<i>+${night.maybe}</i>` : ""}</span></div>
         <div class="seg">${segs}</div>
-        <div class="windows">${wins}</div>
         <div class="chips">${chips || '<span class="muted">Empty</span>'}</div>
         ${isManager ? adminRestChips(roster, avail, day, page.kind) : ""}
         ${lockBtn}
@@ -242,7 +206,7 @@ async function renderAvailability(roster, avail, playerId, kind) {
     .map((p) => `<li><strong>${escapeHtml(p.name)}</strong> — ${escapeHtml(String(p.limits).trim())}</li>`)
     .join("");
   return `
-    <p class="kicker">Need ${needed} at the same time</p>
+    <p class="kicker">Need ${needed} for the night</p>
     <h1>${escapeHtml(page.title)}</h1>
     <p class="lede">${escapeHtml(page.lede.replace("NEED", String(needed)))}</p>
     ${availTabs(page.kind)}
@@ -318,30 +282,25 @@ function paintLiveDay(card, avail, roster) {
   const day = card.dataset.day;
   card.querySelectorAll(".seg label").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
   const status = (card.querySelector(`input[name="st-${day}"]:checked`) || {}).value || "no";
-  const boxes = [...card.querySelectorAll(`input[name="w-${day}"]`)];
-  if (status !== "no" && boxes.length && !boxes.some((b) => b.checked)) {
-    boxes.forEach((b) => {
-      b.checked = true;
-    });
-  }
   const myId = sessionPlayerId(roster.players);
   const myName = sessionPlayerName(roster.players);
-  const myWindows = boxes.filter((b) => b.checked).map((b) => b.value);
-  card.querySelectorAll(".win-count").forEach((el) => {
-    const t = liveTally(avail, day, el.dataset.window, myId, myName, status, myWindows);
-    const b = el.querySelector("b");
-    const extra = el.querySelector("i");
+  const t = liveTally(avail, day, "", myId, myName, status, []);
+  const needed = (avail && avail.needed) || 6;
+  card.classList.toggle("go", t.yes >= needed);
+  card.classList.toggle("close", t.yes < needed && t.yes + t.maybe >= needed);
+  const count = card.querySelector(".win-count");
+  if (count) {
+    count.classList.toggle("go", t.yes >= needed);
+    const b = count.querySelector("b");
+    const extra = count.querySelector("i");
     if (b) b.textContent = t.yes;
     if (t.maybe) {
       if (extra) extra.textContent = "+" + t.maybe;
-      else el.insertAdjacentHTML("beforeend", `<i>+${t.maybe}</i>`);
+      else count.insertAdjacentHTML("beforeend", `<i>+${t.maybe}</i>`);
     } else if (extra) extra.remove();
-  });
-  const on = card.querySelector(".win-count.on");
-  const slot = liveTally(avail, day, on ? on.dataset.window : "", myId, myName, status, myWindows);
-  const dayAll = liveTally(avail, day, "", myId, myName, status, myWindows);
+  }
   const el = card.querySelector(".chips");
-  if (el) el.innerHTML = availChips(slot.names, dayAll.names) || '<span class="muted">Empty</span>';
+  if (el) el.innerHTML = availChips(t.names) || '<span class="muted">Empty</span>';
 }
 
 function firstWindowOffer(avail) {
@@ -354,14 +313,10 @@ function firstWindowOffer(avail) {
 function askFirstWindow(playerId, offer, avail, kind, onDone) {
   clearWhoModal();
   const day = offerKey(offer, kind);
-  const wins = windowsForOffer(offer, (avail && avail.windows) || []);
   const when = new Date(offer.date + "T12:00:00");
   const label = Number.isNaN(when.getTime())
     ? cap(offer.day)
     : when.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-  const winHtml = wins
-    .map((w) => `<label><input type="checkbox" name="win" value="${escapeHtml(w.id)}" checked /> ${escapeHtml(w.hint)}</label>`)
-    .join("");
   const wrap = document.createElement("div");
   wrap.id = "who-modal";
   wrap.className = "who-modal";
@@ -375,7 +330,6 @@ function askFirstWindow(playerId, offer, avail, kind, onDone) {
         <label><input type="radio" name="st" value="maybe" /> Maybe</label>
         <label><input type="radio" name="st" value="no" /> No</label>
       </div>
-      ${winHtml ? `<div class="windows" style="margin-top:0.65rem">${winHtml}</div>` : ""}
       <p class="muted first-win-msg"></p>
       <button class="btn" type="submit">Save this night</button>
     </form>`;
@@ -389,10 +343,6 @@ function askFirstWindow(playerId, offer, avail, kind, onDone) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const status = String(new FormData(form).get("st") || "no");
-    let windows = [...form.querySelectorAll('input[name="win"]:checked')].map((i) => i.value);
-    if (status !== "no" && windows.length === 0) {
-      windows = [...form.querySelectorAll('input[name="win"]')].map((i) => i.value);
-    }
     const msg = form.querySelector(".first-win-msg");
     const btn = form.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
@@ -400,7 +350,7 @@ function askFirstWindow(playerId, offer, avail, kind, onDone) {
     try {
       const saved = await api.send("/api/availability/" + playerId, "PUT", {
         kind: (offer && offer.source) || kind,
-        days: { [day]: { status, windows: status === "no" ? [] : windows } },
+        days: { [day]: { status, windows: [] } },
       });
       applyAvailSave(avail, saved);
       wrap.remove();
@@ -490,13 +440,9 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     }
     const day = card.dataset.day;
     const status = (card.querySelector(`input[name="st-${day}"]:checked`) || {}).value || "no";
-    let windows = [...card.querySelectorAll(`input[name="w-${day}"]:checked`)].map((i) => i.value);
-    if (status !== "no" && windows.length === 0) {
-      windows = [...card.querySelectorAll(`input[name="w-${day}"]`)].map((i) => i.value);
-    }
     const n = ++saveN;
     if (msg) msg.textContent = "Saving…";
-    api.send("/api/availability/" + playerId, "PUT", { days: { [day]: { status, windows } }, kind: card.dataset.kind || page.kind })
+    api.send("/api/availability/" + playerId, "PUT", { days: { [day]: { status, windows: [] } }, kind: card.dataset.kind || page.kind })
       .then((next) => {
         if (n !== saveN) return;
         applyAvailSave(avail, next);
@@ -519,17 +465,10 @@ function bindAvailability(roster, skipAsk, kind, avail) {
       const day = card.dataset.day;
       const on = !!act.dataset.adminSign;
       const id = act.dataset.adminSign || act.dataset.adminDrop;
-      const windows = on ? [...card.querySelectorAll(`input[name="w-${day}"]`)].map((i) => i.value) : [];
+      const windows = [];
       api.send("/api/availability/" + id, "PUT", { days: { [day]: { status: on ? "yes" : "no", windows } }, kind: card.dataset.kind || page.kind })
         .then(() => redraw(sessionPlayerId(roster.players), true, card.dataset.date))
         .catch((err) => alert(err.message));
-      return;
-    }
-    const win = e.target.closest(".win-count");
-    if (win) {
-      const card = win.closest("article.day");
-      card.querySelectorAll(".win-count").forEach((el) => el.classList.toggle("on", el === win));
-      paintLiveDay(card, avail, roster);
       return;
     }
     if (e.target.closest("input, label, button, a, select")) return;
