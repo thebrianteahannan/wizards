@@ -1,4 +1,5 @@
 const LEAGUE = 61713;
+const TEAM_ID = 228246;
 const SEASONS = [
   { id: 110335, label: "Florida Challengers League" },
   { id: 110274, label: "2026 Tourney Season" },
@@ -7,6 +8,9 @@ const BATTER_URL =
   "https://www.mystatsonline.com/ballsports/visitor/league/stats/batter.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
 const PITCHER_URL =
   "https://www.mystatsonline.com/ballsports/visitor/league/stats/pitcher.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
+const GAME_URL =
+  "https://www.mystatsonline.com/ballsports/visitor/league/schedule_scores/game_score.aspx?IDLeague=" + LEAGUE + "&IDGame=";
+const MO = "January,February,March,April,May,June,July,August,September,October,November,December".split(",");
 const CELL_KEYS = ["g", "avg", "slg", "obp", "ab", "r", "h", "singles", "doubles", "triples", "hr", "rbi", "tb", "so", "bb", "sf", "tpa", "roe", "ops", "fc"];
 const PITCH_KEYS = ["g", "w", "l", "sv", "era", "ip", "h", "r", "er", "bb", "so", "hr", "bf", "gs", "cg", "sho", "avg", "whip", "sox", "bbx"];
 const NAME_ALIASES = [{ last: "Nicolson", first: "Shaun", asLast: "Nicholson", asFirst: "Shaun" }];
@@ -76,13 +80,122 @@ function parseRows(html, keys) {
   return rows;
 }
 
-async function fetchTable(base, seasonId, keys) {
+async function fetchHtml(url) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), 12000);
-  const res = await fetch(base + seasonId, { signal: ac.signal, headers: { "user-agent": "WizardsHub/1.0" } });
-  clearTimeout(timer);
-  if (!res.ok) throw new Error("PLW " + res.status);
-  return parseRows(await res.text(), keys);
+  try {
+    const res = await fetch(url, { signal: ac.signal, headers: { "user-agent": "WizardsHub/1.0" } });
+    if (!res.ok) throw new Error("PLW " + res.status);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchTable(base, seasonId, keys) {
+  return parseRows(await fetchHtml(base + seasonId), keys);
+}
+
+function matchLogPlayer(players, last, first) {
+  const alias = aliasFor(last, first);
+  if (alias) {
+    last = alias.asLast;
+    first = alias.asFirst;
+  }
+  const L = String(last || "").toLowerCase();
+  const F = String(first || "").toLowerCase();
+  const exact = (players || []).find((p) => {
+    const n = nameParts(p.name);
+    return n.last === L && n.first === F;
+  });
+  if (exact) return exact;
+  return (
+    (players || []).find((p) => {
+      const n = nameParts(p.name);
+      if (n.first !== F) return false;
+      return n.last.startsWith(L.slice(0, 4)) || L.startsWith(n.last.slice(0, 4));
+    }) || null
+  );
+}
+
+function gameDate(html) {
+  const m = String(html || "").match(
+    /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/
+  );
+  const i = MO.indexOf(m && m[1]);
+  if (!m || i < 0) return "";
+  return m[3] + "-" + String(i + 1).padStart(2, "0") + "-" + String(m[2]).padStart(2, "0");
+}
+
+function parseGameHits(html) {
+  const date = gameDate(html);
+  const rows = [];
+  for (const chunk of String(html || "").split("<tr>")) {
+    if (!/batter_card/.test(chunk)) continue;
+    const named = chunk.match(/<span id='([^']+)'>/);
+    if (!named) continue;
+    const [last, first] = named[1].split(",").map((s) => s.trim());
+    const cells = [...chunk.matchAll(/<td class=" text-center">([^<]*)<\/td>/g)].map((x) => x[1]);
+    if (cells.length < 7) continue;
+    rows.push({ date, last, first, ab: Number(cells[3]) || 0, h: Number(cells[6]) || 0 });
+  }
+  return rows;
+}
+
+function packHits(games) {
+  const ab = games.reduce((a, r) => a + r.ab, 0);
+  const h = games.reduce((a, r) => a + r.h, 0);
+  return { ab, h, avg: ab ? h / ab : 0 };
+}
+
+function splitTrend(games) {
+  const list = (games || []).filter((g) => g.ab > 0).sort((a, b) => a.date.localeCompare(b.date));
+  if (list.length < 4) return null;
+  const recent = list.slice(-3);
+  const prior = list.slice(0, -3);
+  const r = packHits(recent);
+  const p = packHits(prior);
+  if (r.ab < 5 || p.ab < 6) return null;
+  const delta = r.avg - p.avg;
+  if (delta < 0.04 && delta > -0.04) return null;
+  return {
+    dir: delta >= 0.04 ? "up" : "down",
+    delta: Math.round(delta * 1000) / 1000,
+    recentAvg: fmtRate(r.h, r.ab),
+    priorAvg: fmtRate(p.h, p.ab),
+    recentG: recent.length,
+  };
+}
+
+async function loadHitTrends(players) {
+  const pages = await Promise.all(
+    SEASONS.map((s) =>
+      fetchHtml(
+        "https://www.mystatsonline.com/ballsports/visitor/league/stats/team.aspx?IDLeague=" +
+          LEAGUE +
+          "&IDSeason=" +
+          s.id +
+          "&IDTeam=" +
+          TEAM_ID
+      ).catch(() => "")
+    )
+  );
+  const ids = [...new Set(pages.flatMap((html) => [...String(html).matchAll(/IDGame=(\d+)/g)].map((m) => m[1])))];
+  const boxes = await Promise.all(ids.map((id) => fetchHtml(GAME_URL + id).catch(() => "")));
+  const byId = {};
+  for (const box of boxes) {
+    for (const row of parseGameHits(box)) {
+      const p = matchLogPlayer(players, row.last, row.first);
+      if (!p) continue;
+      (byId[p.id] = byId[p.id] || []).push(row);
+    }
+  }
+  const out = {};
+  for (const [id, games] of Object.entries(byId)) {
+    const t = splitTrend(games);
+    if (t) out[id] = t;
+  }
+  return out;
 }
 
 function attachIds(rows, players) {
@@ -231,13 +344,17 @@ function packKind(leagueRows, tourneyRows, players, combine) {
 
 async function getPlwStats(players, force) {
   if (!force && cache.data && Date.now() - cache.at < 15 * 60 * 1000) return cache.data;
-  const [bL, bT, pL, pT] = await Promise.all([
+  const [bL, bT, pL, pT, trends] = await Promise.all([
     fetchTable(BATTER_URL, SEASONS[0].id, CELL_KEYS),
     fetchTable(BATTER_URL, SEASONS[1].id, CELL_KEYS),
     fetchTable(PITCHER_URL, SEASONS[0].id, PITCH_KEYS),
     fetchTable(PITCHER_URL, SEASONS[1].id, PITCH_KEYS),
+    loadHitTrends(players).catch(() => ({})),
   ]);
   const bats = packKind(bL, bT, players, combineBat);
+  for (const row of bats.rows) {
+    if (trends[row.playerId]) row.trend = trends[row.playerId];
+  }
   for (const row of bats.rows) {
     if (row.playerId !== "brian-hannan") continue;
     if (row.tourney && Number(row.tourney.h) < 1) {

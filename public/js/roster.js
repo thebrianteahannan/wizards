@@ -25,7 +25,6 @@ function playerMark(avail, playerId, offer, kind) {
 
 function rosterRows(players, dead, stats) {
   const admin = isAdmin();
-  const lastCol = admin ? (dead ? "11.5rem" : "6.8rem") : "5.2rem";
   const offStatuses = [
     { status: "IR", label: "IR" },
     { status: "New", label: "New" },
@@ -40,34 +39,37 @@ function rosterRows(players, dead, stats) {
         : `<span class="tag" style="white-space:nowrap">${escapeHtml(pos)}</span>`;
       let last;
       if (dead && admin) {
-        last = `<span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:0.12rem">
+        last = `<span class="roster-acts roster-edit-acts">
           ${offStatuses
             .map((s) => {
               const on = cur === s.status;
-              return `<button type="button" class="btn ${on ? "" : "ghost"}" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}" style="padding:0.08rem 0.28rem;font-size:0.62rem">${s.label}</button>`;
+              return `<button type="button" class="btn ${on ? "" : "ghost"}" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}">${s.label}</button>`;
             })
             .join("")}
-          <button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="Active" style="padding:0.08rem 0.28rem;font-size:0.62rem">On</button>
-          <button type="button" class="btn ghost" data-roster-del="${escapeHtml(p.id)}" style="padding:0.08rem 0.28rem;font-size:0.62rem" title="Delete player">Del</button>
+          <button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="Active">On</button>
+          <button type="button" class="btn ghost" data-roster-del="${escapeHtml(p.id)}" title="Delete player">Del</button>
         </span>`;
       } else if (dead) {
         const label = typeof rosterStatusLabel === "function" ? rosterStatusLabel(cur) : cur;
-        last = `<span class="muted">${escapeHtml(label)}</span>`;
+        last = `<span class="muted roster-acts">${escapeHtml(label)}</span>`;
       } else if (admin) {
-        last = `<span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:0.12rem">${offStatuses
-          .map((s) => `<button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}" style="padding:0.08rem 0.28rem;font-size:0.62rem">${s.label}</button>`)
+        last = `<span class="roster-acts roster-edit-acts">${offStatuses
+          .map((s) => `<button type="button" class="btn ghost" data-status-set="${escapeHtml(p.id)}" data-status="${s.status}">${s.label}</button>`)
           .join("")}</span>`;
       } else {
-        last = `<span class="muted">${p.born ? escapeHtml(p.born) : ""}</span>`;
+        last = "";
       }
-      const avg = `<span class="muted roster-avg" title="Combined batting average">${escapeHtml(rosterAvgText(stats, p))}</span>`;
+      const hit = typeof batterRow === "function" ? batterRow(stats, p) : null;
+      const avg = `<span class="muted roster-avg" title="Combined AVG / OBP">${escapeHtml(rosterAvgText(stats, p))}${hitTrendMark(hit)}</span>`;
       return `
-        <div class="roster-row" style="grid-template-columns:2rem minmax(0,1.4fr) 2.8rem 7.2rem ${lastCol};${dead ? "opacity:0.55" : ""}">
-          <span class="num">${i + 1}</span>
+        <div class="roster-row${dead ? " sideline" : ""}">
+          <span class="num roster-n">${i + 1}</span>
           <span class="roster-who"><strong>${escapeHtml(p.name)}</strong>${avg}</span>
-          <span class="num">${p.number != null ? "#" + p.number : "—"}</span>
-          ${tag}
-          ${last}
+          <div class="roster-extra">
+            <span class="num roster-jersey">${p.number != null ? "#" + p.number : ""}</span>
+            ${tag}
+            ${last}
+          </div>
         </div>`;
     })
     .join("");
@@ -361,7 +363,7 @@ function rosterDiamond(players, svgId, marks, offer, pitcherId, extraBench) {
   const note = !players.length
     ? `<p class="muted">Select a date to see that night's potential roster.</p>`
     : mound
-      ? `<p class="muted">${escapeHtml(mound.name)} pitching. Tap another name on the mound to switch.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""}${tone}</p>`
+      ? `${when || tone ? `<p class="muted">${when ? `Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""}${tone}</p>` : ""}`
       : `<p class="muted">3B, SS, 2B, LF, CF, and P.${when ? ` Next up: <strong>${escapeHtml(when)}</strong> · ${escapeHtml(offer.note)}.` : ""}${tone}</p>`;
   return `
     <div class="diamond-card card">
@@ -502,10 +504,28 @@ function sortByAvg(players, stats) {
 
 function rosterAvgText(stats, p) {
   const hit = typeof batterRow === "function" ? batterRow(stats, p) : null;
-  const raw = hit && hit.avg != null && hit.avg !== "" ? String(hit.avg) : "";
-  if (!raw || rosterAvg(stats, p) < 0) return "—";
-  return raw;
+  const avg = hit && hit.avg != null && hit.avg !== "" ? String(hit.avg) : "";
+  if (!avg || rosterAvg(stats, p) < 0) return "—";
+  const obp = hit && hit.obp != null && hit.obp !== "" ? String(hit.obp) : "";
+  return obp ? avg + " / " + obp : avg;
 }
+
+function hitTrendMark(hit) {
+  const t = hit && hit.trend;
+  if (!t) return "";
+  const pts = Math.round(Math.abs(Number(t.delta)) * 1000);
+  if (t.dir === "up") {
+    const tip = "On the rise: " + t.recentAvg + " last " + t.recentG + " games vs " + t.priorAvg + " before (+" + pts + " points)";
+    return `<span class="hit-hot" title="${escapeHtml(tip)}">↑</span>`;
+  }
+  if (t.dir === "down" && typeof isAdmin === "function" && isAdmin()) {
+    const tip = "Cooling off: " + t.recentAvg + " last " + t.recentG + " games vs " + t.priorAvg + " before (−" + pts + " points)";
+    return `<span class="hit-cold" title="${escapeHtml(tip)}">↓</span>`;
+  }
+  return "";
+}
+
+let rosterEditing = false;
 
 function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading, stats) {
   const active = roster.players.filter(isActive);
@@ -516,8 +536,9 @@ function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading, st
   const offer = nextProposed(avail);
   const pitcherId = pickPitcherId(active);
   const title = heading === "h2" ? "h2" : "h1";
+  const admin = isAdmin();
   return `
-    <div id="roster-embed" data-svg="${escapeHtml(svgId || "dg-roster")}">
+    <div id="roster-embed"${rosterEditing ? ' class="roster-editing"' : ""} data-svg="${escapeHtml(svgId || "dg-roster")}">
       <div class="sched-bar">
         <div>
           <p class="kicker">${escapeHtml(roster.league)} · ${escapeHtml(roster.season)}</p>
@@ -527,7 +548,10 @@ function renderRosterEmbed(roster, leagueAvail, tourneyAvail, svgId, heading, st
       <p class="muted">Locked roster · need 6 to take a night · ${active.length} on the book</p>
       <div class="roster-layout">
         ${rosterDiamond(active, svgId || "dg-roster", {}, offer, pitcherId)}
-        <div class="roster-list">${rosterRows(sortByAvg(active, stats), false, stats)}</div>
+        <div class="roster-book">
+          ${admin ? `<div class="actions" style="margin:0 0 0.45rem"><button class="btn ghost" type="button" id="toggle-roster-edit">${rosterEditing ? "Hide statuses" : "Edit statuses"}</button></div>` : ""}
+          <div class="roster-list">${rosterRows(sortByAvg(active, stats), false, stats)}</div>
+        </div>
       </div>
       ${inactive.length ? `<div class="roster-list" style="margin-top:0.85rem"><p class="kicker">Sideline · IR / New / Away</p>${rosterRows(inactive, true, stats)}</div>` : ""}
     </div>
@@ -587,5 +611,14 @@ function bindRoster(roster, leagueAvail, tourneyAvail, stats) {
   });
   bindPosEditor(document.getElementById("roster-embed"), roster, redraw);
   bindPhones(roster);
+  const editBtn = document.getElementById("toggle-roster-edit");
+  if (editBtn) {
+    editBtn.addEventListener("click", () => {
+      rosterEditing = !rosterEditing;
+      const box = document.getElementById("roster-embed");
+      if (box) box.classList.toggle("roster-editing", rosterEditing);
+      editBtn.textContent = rosterEditing ? "Hide statuses" : "Edit statuses";
+    });
+  }
   if (typeof loadOffense === "function") loadOffense(roster);
 }

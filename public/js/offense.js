@@ -129,9 +129,9 @@ function splitStatLines(hit, empty, lineOf) {
   if (!hit) return `<span class="muted">${empty}</span>`;
   const row = (label, data) => {
     const body = data ? lineOf(data) : `<span class="muted">—</span>`;
-    return `<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="display:inline-block;width:3.7rem;color:var(--cyan);font-size:0.62rem;letter-spacing:0.06em">${label}</span> ${body}</div>`;
+    return `<div class="stat-line"><span class="stat-kind">${label}</span><span class="stat-body">${body}</span></div>`;
   };
-  return `<div style="min-width:0">${row("League", hit.league)}${row("Tourney", hit.tourney)}${row("Total", hit)}</div>`;
+  return `<div class="stat-block">${row("League", hit.league)}${row("Tourney", hit.tourney)}${row("Total", hit)}</div>`;
 }
 
 function batterBlock(hit) {
@@ -147,13 +147,13 @@ function renderOffense(roster, stats, customIds, mode) {
       const score = hitterRating(hit);
       const cols = admin ? "2.2rem 3.2rem 8.4rem minmax(0,1fr) 6.4rem" : "2.2rem 3.2rem 8.4rem minmax(0,1fr)";
       const move = admin
-        ? `<span><button type="button" class="btn ghost" data-bat-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-bat-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
+        ? `<span class="stat-move"><button type="button" class="btn ghost" data-bat-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-bat-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
       const grade = score == null ? `<span class="muted">—</span>` : `<b style="${ratingTone(score)}">${score}</b>`;
-      return `<div class="roster-row" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
+      return `<div class="roster-row stat-row${admin ? " admin" : ""}" data-batter="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
         <span class="num">${i + 1}</span>
         <span class="num" title="Hit rating">${grade}</span>
-        <strong>${escapeHtml(p.name)}</strong>
+        <strong>${escapeHtml(p.name)}${typeof hitTrendMark === "function" ? hitTrendMark(hit) : ""}</strong>
         <div class="muted" style="font-size:0.72rem;line-height:1.35">${batterBlock(hit)}</div>
         ${move}
       </div>`;

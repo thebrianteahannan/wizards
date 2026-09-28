@@ -68,7 +68,7 @@
       "born": null,
       "name": "Damian Gilpin",
       "role": "Player",
-      "number": null,
+      "number": 11,
       "status": "Active",
       "regular": true,
       "positions": [
@@ -111,7 +111,7 @@
       "name": "Kevin McCracken",
       "role": "Player",
       "limits": "Fridays; sometimes Mondays and weekends",
-      "number": null,
+      "number": 2,
       "status": "Active",
       "regular": true,
       "positions": [

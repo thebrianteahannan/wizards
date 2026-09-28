@@ -110,10 +110,10 @@ function renderPitching(roster, stats, customIds) {
       const score = pitchRating(row);
       const cols = admin ? "2.2rem 3.2rem 8.4rem minmax(0,1fr) 6.4rem" : "2.2rem 3.2rem 8.4rem minmax(0,1fr)";
       const move = admin
-        ? `<span><button type="button" class="btn ghost" data-pit-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-pit-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
+        ? `<span class="stat-move"><button type="button" class="btn ghost" data-pit-up="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↑</button> <button type="button" class="btn ghost" data-pit-down="${escapeHtml(p.id)}" style="padding:0.12rem 0.4rem;font-size:0.7rem">↓</button></span>`
         : "";
       const grade = score == null ? `<span class="muted">—</span>` : `<b style="${pitchTone(score)}">${score}</b>`;
-      return `<div class="roster-row" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
+      return `<div class="roster-row stat-row${admin ? " admin" : ""}" data-pitcher-arm="${escapeHtml(p.id)}" style="grid-template-columns:${cols};align-items:start">
         <span class="num">${i + 1}</span>
         <span class="num" title="Pitch rating">${grade}</span>
         <strong>${escapeHtml(p.name)}</strong>

@@ -30,19 +30,6 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail, stats) {
   const nightCard = team
     ? `<a class="card feature" href="#/availability"><span class="icon">◉</span><h3>Match days</h3><p class="muted">Lock six bodies on one window.</p><div class="sparks" aria-hidden="true">${sparks}</div></a>`
     : `<a class="card feature" href="#/league"><span class="icon">◉</span><h3>PLW Info</h3><p class="muted">Fall tryouts. Real League in January.</p></a>`;
-  const duesCard = team
-    ? `<a class="card feature" href="#/dues"><span class="icon">$</span><h3>Dues</h3><p class="muted">${fees && fees.model === "flat" ? money(fees.flatAmount) + " flat for the year" : "$250 team bill"}</p></a>`
-    : `<a class="card feature" href="#/join"><span class="icon">+</span><h3>Join</h3><p class="muted">Tryouts this fall. Put your name in.</p></a>`;
-  const jerseyCard = team
-    ? `<a class="card feature" href="#/gear">
-        <span class="icon">✦</span>
-        <h3>Jersey request</h3>
-        <p class="muted">Number, size, purple kit.</p>
-      </a>`
-    : "";
-  const duesStat = team
-    ? `<a class="card stat" href="#/dues"><b>${fees ? money(fees.model === "flat" ? fees.flatAmount : fees.teamTotal) : "$250"}</b>${fees && fees.model === "flat" ? "flat dues this year" : "team fee for the year"}</a>`
-    : "";
   const pulse = team
     ? `<article class="card"><p class="kicker">Availability pulse</p><h2>${best && best.yes >= 6 ? "We can field a night" : "Still hunting a night"}</h2><p>${best ? `<span class="${best.yes >= 6 ? "ok" : "warn"}">${best.yes} yes / ${best.maybe} maybe</span> on ${cap(best.day)} ${best.window}` : "Nobody has filled nights yet. Grab League and tap your week."}</p><p class="muted">Fall league is flexible weeknights and weekends until the lights are fully in.</p></article>`
     : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League, announcements, and dues open with the team password in the header.</p></article>`;
@@ -80,23 +67,11 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail, stats) {
         <h3>Schedule</h3>
         <p class="muted">${next ? fmtDate(next.date) + " · " + escapeHtml(next.when) : "Calendar loading"}</p>
       </a>
-      ${jerseyCard}
-      ${duesCard}
       <a class="card feature" href="#/roster">
         <span class="icon">☰</span>
         <h3>Roster</h3>
         <p class="muted">${roster.players.filter(isActive).length} Wizards · cap 12 · need 6</p>
       </a>
-      <a class="card feature" href="#/media">
-        <span class="icon">◈</span>
-        <h3>Media</h3>
-        <p class="muted">Kits, K-zone, Brooksville film.</p>
-      </a>
-    </section>
-    <section class="${team ? "grid-3" : "grid-2"}" style="margin-top:1rem">
-      <article class="card stat"><b>${roster.players.filter(isActive).length}</b>rostered Wizards</article>
-      <article class="card stat"><b>6</b>needed for league night</article>
-      ${duesStat}
     </section>
     <section style="margin-top:1.2rem">
       ${renderRosterEmbed(roster, avail, tourneyAvail, "dg-home", "h2", stats)}
@@ -170,7 +145,6 @@ function renderMedia() {
   const shots = [
     ["jersey-mockup.jpg", "Pinstripe Wizard alternate jersey — front and back."],
     ["jerseys-box.jpg", "Kits in the box: wizard crest, stars, wiffle ball."],
-    ["field-selfie.jpg", "Field day — turf, batting mat, Spanish moss."],
     ["batting-stance.jpg", "In the box, yellow bat, white PVC fence."],
     ["batting-followthrough.jpg", "Swing through. Prodigy on the back."],
     ["pitching-windup.jpg", "Windup from the rubber."],
@@ -179,7 +153,6 @@ function renderMedia() {
     ["backstop-frame.jpg", "DIY PVC frame going up."],
     ["turf-shoes.jpg", "Approved 3n2 MOFO turf shoe."],
     ["league-texts.png", "PLW opening notes and team texts."],
-    ["roster-fcl.jpg", "FCL roster board."],
   ];
   const figs = shots
     .map(

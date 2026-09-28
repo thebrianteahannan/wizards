@@ -293,7 +293,7 @@ a.hud:hover { border-color: var(--cyan); }
 .roster-list { display: grid; gap: 0.35rem; }
 .roster-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) 3rem 5rem 5.6rem;
+  grid-template-columns: 2rem auto minmax(0, 1fr);
   gap: 0.5rem;
   align-items: center;
   padding: 0.38rem 0.65rem;
@@ -302,6 +302,7 @@ a.hud:hover { border-color: var(--cyan); }
   background: var(--card);
   font-size: 0.88rem;
 }
+.roster-row.sideline { opacity: 0.55; }
 .roster-row > * { min-width: 0; }
 .roster-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roster-row .num { text-align: center; font-variant-numeric: tabular-nums; }
@@ -310,10 +311,33 @@ a.hud:hover { border-color: var(--cyan); }
 .roster-who {
   display: flex;
   align-items: baseline;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.roster-who strong { flex: 0 1 auto; min-width: 0; }
+.roster-extra {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.4rem;
   min-width: 0;
 }
-.roster-who strong { flex: 0 1 auto; }
+.roster-jersey { width: 2.6rem; flex: 0 0 auto; }
+.roster-acts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.12rem;
+}
+.roster-acts .btn {
+  padding: 0.08rem 0.28rem;
+  font-size: 0.62rem;
+}
+.roster-book { min-width: 0; }
+.roster-acts.roster-edit-acts { display: none; }
+.roster-editing .roster-acts.roster-edit-acts { display: inline-flex; }
 .roster-limits {
   flex: 1 1 3.5rem;
   min-width: 0;
@@ -338,6 +362,18 @@ a.hud:hover { border-color: var(--cyan); }
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.hit-hot {
+  color: var(--go);
+  font-weight: 700;
+  margin-left: 0.12rem;
+  font-size: 0.85em;
+}
+.hit-cold {
+  color: #fb7185;
+  font-weight: 700;
+  margin-left: 0.12rem;
+  font-size: 0.85em;
 }
 button.roster-limits { cursor: pointer; }
 .diamond-card { padding: 0.9rem; }
@@ -515,7 +551,28 @@ a.card { color: inherit; }
 .cal-avail .btn { font-size: 0.78rem; padding: 0.28rem 0.6rem; }
 .cal-avail .btn.on { border-color: rgba(52, 245, 160, 0.55); background: rgba(52, 245, 160, 0.12); }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; }
-.cal-h { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); text-align: center; }
+.stat-block { min-width: 0; }
+.stat-line {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  text-align: left;
+  white-space: normal;
+}
+.stat-kind {
+  flex: 0 0 3.6rem;
+  color: var(--cyan);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+}
+.stat-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-align: left;
+  line-height: 1.35;
+}
 .cal-cell {
   min-height: 78px; border: 1px solid var(--line); border-radius: 10px;
   padding: 0.28rem; background: rgba(5, 8, 20, 0.7);
@@ -562,7 +619,40 @@ a.cal-pill:hover { filter: brightness(1.2); }
   }
   .nav.open { display: flex; }
   .hero, .grid-3, .grid-2, .day-grid, .event, .week-edit .row, .feature-rail, .roster-layout { grid-template-columns: 1fr; }
-  .roster-row { grid-template-columns: minmax(0, 1.6fr) 2.8rem 4.4rem 5.2rem; font-size: 0.8rem; }
+  .roster-row {
+    grid-template-columns: 1.4rem auto minmax(0, 1fr);
+    gap: 0.2rem 0.4rem;
+    padding: 0.32rem 0.5rem;
+    font-size: 0.84rem;
+  }
+  .roster-n { align-self: center; padding-top: 0; }
+  .roster-who strong { overflow: visible; text-overflow: clip; }
+  .roster-extra {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.16rem 0.32rem;
+  }
+  .roster-jersey { width: auto; font-size: 0.78rem; }
+  .roster-row .tag { font-size: 0.58rem; padding: 0.04rem 0.28rem; letter-spacing: 0.04em; }
+  .roster-acts { justify-content: flex-start; }
+  .roster-acts .btn { padding: 0.04rem 0.22rem; font-size: 0.52rem; letter-spacing: 0.04em; }
+  .stat-row {
+    grid-template-columns: 1.45rem 2.3rem minmax(0, 1fr) !important;
+    grid-template-areas:
+      "n rate name"
+      "stats stats stats";
+  }
+  .stat-row.admin {
+    grid-template-columns: 1.45rem 2.3rem minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "n rate name move"
+      "stats stats stats stats";
+  }
+  .stat-row > .num:nth-of-type(1) { grid-area: n; }
+  .stat-row > .num:nth-of-type(2) { grid-area: rate; }
+  .stat-row > strong { grid-area: name; overflow: visible; text-overflow: clip; }
+  .stat-row > .muted { grid-area: stats; text-align: left !important; }
+  .stat-row .stat-move { grid-area: move; }
   .cal-cell { min-height: 56px; }
   .hud-tl, .hud-br { position: static; margin: 0.4rem 0; animation: none; }
   .hero-stage::before, .hero-stage::after { display: none; }
