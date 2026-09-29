@@ -126,6 +126,26 @@ function adminRestChips(roster, avail, day, kind) {
   return tags ? `<div class="chips" data-admin-add style="margin-top:0.3rem">${tags}</div>` : "";
 }
 
+function setPlayerDay(avail, id, name, day, status) {
+  if (!avail.players) avail.players = {};
+  const cur = avail.players[id] || { name: name || id, days: {} };
+  const days = { ...(cur.days || {}) };
+  days[day] = { ...(days[day] || {}), status, windows: (days[day] || {}).windows || [] };
+  avail.players[id] = { ...cur, name: name || cur.name, days };
+}
+
+function refreshAdminRest(card, roster, avail) {
+  const html = adminRestChips(roster, avail, card.dataset.day, card.dataset.kind);
+  const box = card.querySelector("[data-admin-add]");
+  if (html) {
+    if (box) box.outerHTML = html;
+    else {
+      const chips = card.querySelector(".chips");
+      if (chips) chips.insertAdjacentHTML("afterend", html);
+    }
+  } else if (box) box.remove();
+}
+
 function chipName(n) {
   return n && n.name != null ? n.name : String(n || "");
 }
@@ -135,6 +155,39 @@ function availChips(names) {
     ...(names.yes || []).map((n) => `<span class="chip yes"${n && n.id ? ` data-admin-drop="${escapeHtml(n.id)}" style="cursor:pointer"` : ""}>${escapeHtml(chipName(n))}</span>`),
     ...(names.maybe || []).map((n) => `<span class="chip maybe">${escapeHtml(chipName(n))}?</span>`),
   ].join("");
+}
+
+function lockControlHtml(day, isManager, go, locked, kind) {
+  if (locked && locked.day === day) {
+    const who = locked.lockedBy ? " · " + escapeHtml(locked.lockedBy) : "";
+    return `<p class="ok day-lock">Locked${who}</p>`;
+  }
+  if (isManager && go) {
+    return `<button class="btn day-lock" data-lock="${escapeHtml(day)}" data-window="night" data-kind="${escapeHtml(kind)}" type="button">Lock</button>`;
+  }
+  return `<span class="day-lock" hidden></span>`;
+}
+
+function lockBannerHtml(locked, isManager, kind) {
+  if (!locked) return "";
+  const clear = isManager
+    ? ` <button class="btn ghost" id="clear-lock" data-kind="${escapeHtml(locked.source || kind)}" type="button">Clear lock</button>`
+    : "";
+  return `<div class="banner" id="lock-banner">Locked: <strong>${escapeHtml(lockLabel(locked.day))} ${escapeHtml(locked.window)}</strong> by ${escapeHtml(locked.lockedBy)}.${clear}</div>`;
+}
+
+function paintLockChrome(avail, isManager, kind) {
+  const host = document.getElementById("lock-banner-host");
+  if (host) host.innerHTML = lockBannerHtml(avail.lockedNight, isManager, kind);
+  const needed = (avail && avail.needed) || 6;
+  document.querySelectorAll("#avail-form article.day").forEach((card) => {
+    const yes = Number((card.querySelector(".win-count b") || {}).textContent || 0);
+    const go = card.classList.contains("go") || yes >= needed;
+    const next = lockControlHtml(card.dataset.day, isManager, go, avail.lockedNight, card.dataset.kind || kind);
+    const el = card.querySelector(".day-lock");
+    if (el) el.outerHTML = next;
+    else card.insertAdjacentHTML("beforeend", next);
+  });
 }
 
 function lockLabel(day) {
@@ -189,10 +242,7 @@ async function renderAvailability(roster, avail, playerId, kind) {
       .map((s) => `<label class="${entry.status === s ? "on" : ""}"><input type="radio" name="st-${day}" value="${s}" ${entry.status === s ? "checked" : ""}/> ${cap(s)}</label>`)
       .join("");
     const src = offer.source || page.kind;
-    const lockBtn =
-      isManager && go
-        ? `<button class="btn" data-lock="${day}" data-window="night" data-kind="${escapeHtml(src)}" type="button">Lock</button>`
-        : "";
+    const lockBtn = lockControlHtml(day, isManager, go, locked, src);
     const fav = src !== "practice" && typeof matchupFavor === "function" ? matchupFavor(offer, book) : null;
     const favHtml =
       fav == null
@@ -245,8 +295,8 @@ async function renderAvailability(roster, avail, playerId, kind) {
       </form>
     </section>` : ""}
     ${!offers.length && page.kind !== "practice" ? `<p class="muted">No dates on the board yet.</p>` : ""}
-    ${locked ? `<div class="banner">Locked: <strong>${escapeHtml(lockLabel(locked.day))} ${escapeHtml(locked.window)}</strong> by ${escapeHtml(locked.lockedBy)}. ${isManager ? `<button class="btn ghost" id="clear-lock" data-kind="${escapeHtml(locked.source || page.kind)}" type="button">Clear lock</button>` : ""}</div>` : ""}
     <form id="avail-form">
+      <div id="lock-banner-host">${lockBannerHtml(locked, isManager, page.kind)}</div>
       <p id="avail-msg" class="muted">Tap a date card to see that night's diamond. Radios still save your answer.</p>
       <div class="day-grid">${dayCols}</div>
       ${offers.length > 1 ? `<p style="margin:0.55rem 0 0"><button class="btn ghost" type="button" id="avail-more">Show more days</button></p>` : ""}
@@ -417,6 +467,7 @@ function bindAvailability(roster, skipAsk, kind, avail) {
   const form = document.getElementById("avail-form");
   if (!form) return;
   const me = sessionPlayerId(roster.players);
+  const isManager = isAdmin() || ((roster.players || []).find((p) => p.id === me) || {}).role === "Co-manager";
   const redraw = async (id, skip, focusDate) => {
     const [r, a] = await Promise.all([api.get("/api/roster"), loadMatchAvail(page.kind)]);
     document.getElementById("app").innerHTML = await renderAvailability(r, a, id, page.kind === "tournament" ? "league" : page.kind);
@@ -468,17 +519,77 @@ function bindAvailability(roster, skipAsk, kind, avail) {
       });
   });
   form.querySelectorAll("article.day").forEach((card) => paintLiveDay(card, avail, roster));
+  const adminSaveGen = {};
   form.addEventListener("click", (e) => {
+    const lockBtn = e.target.closest("[data-lock]");
+    if (lockBtn) {
+      e.preventDefault();
+      if (lockBtn.disabled) return;
+      const day = lockBtn.dataset.lock;
+      const kind = lockBtn.dataset.kind || page.kind;
+      lockBtn.disabled = true;
+      lockBtn.textContent = "Locking…";
+      api.send("/api/lock-night", "POST", { kind, day, window: lockBtn.dataset.window })
+        .then((next) => {
+          avail.lockedNight = next.lockedNight ? { ...next.lockedNight, source: kind } : null;
+          const msg = document.getElementById("avail-msg");
+          if (msg) msg.textContent = "Locked " + lockLabel(day) + ".";
+          paintLockChrome(avail, isManager, page.kind);
+        })
+        .catch((err) => {
+          lockBtn.disabled = false;
+          lockBtn.textContent = "Lock";
+          alert(err.message);
+        });
+      return;
+    }
+    const clearBtn = e.target.closest("#clear-lock");
+    if (clearBtn) {
+      e.preventDefault();
+      clearBtn.disabled = true;
+      api.send("/api/lock-night", "POST", { kind: clearBtn.dataset.kind || page.kind, clear: true })
+        .then(() => {
+          avail.lockedNight = null;
+          const msg = document.getElementById("avail-msg");
+          if (msg) msg.textContent = "Lock cleared.";
+          paintLockChrome(avail, isManager, page.kind);
+        })
+        .catch((err) => {
+          clearBtn.disabled = false;
+          alert(err.message);
+        });
+      return;
+    }
     const act = e.target.closest("[data-admin-sign], [data-admin-drop]");
     if (act) {
+      e.preventDefault();
       const card = act.closest("article.day");
       const day = card.dataset.day;
       const on = !!act.dataset.adminSign;
       const id = act.dataset.adminSign || act.dataset.adminDrop;
-      const windows = [];
-      api.send("/api/availability/" + id, "PUT", { days: { [day]: { status: on ? "yes" : "no", windows } }, kind: card.dataset.kind || page.kind })
-        .then(() => redraw(sessionPlayerId(roster.players), true, card.dataset.date))
-        .catch((err) => alert(err.message));
+      const player = (roster.players || []).find((p) => p.id === id);
+      const prev = ((((avail.players || {})[id] || {}).days || {})[day] || {}).status || "no";
+      const nextStatus = on ? "yes" : "no";
+      const key = id + "|" + day;
+      const gen = (adminSaveGen[key] || 0) + 1;
+      adminSaveGen[key] = gen;
+      setPlayerDay(avail, id, player && player.name, day, nextStatus);
+      paintLiveDay(card, avail, roster);
+      refreshAdminRest(card, roster, avail);
+      api.send("/api/availability/" + id, "PUT", { days: { [day]: { status: nextStatus, windows: [] } }, kind: card.dataset.kind || page.kind })
+        .then((saved) => {
+          if (adminSaveGen[key] !== gen) return;
+          applyAvailSave(avail, saved);
+          paintLiveDay(card, avail, roster);
+          refreshAdminRest(card, roster, avail);
+        })
+        .catch((err) => {
+          if (adminSaveGen[key] !== gen) return;
+          setPlayerDay(avail, id, player && player.name, day, prev);
+          paintLiveDay(card, avail, roster);
+          refreshAdminRest(card, roster, avail);
+          alert(err.message);
+        });
       return;
     }
     if (e.target.closest("input, label, button, a, select")) return;
@@ -503,28 +614,6 @@ function bindAvailability(roster, skipAsk, kind, avail) {
       }
     });
   }
-  document.querySelectorAll("[data-lock]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      try {
-        const next = await api.send("/api/lock-night", "POST", {
-          kind: btn.dataset.kind || page.kind,
-          day: btn.dataset.lock,
-          window: btn.dataset.window,
-        });
-        applyAvailSave(avail, next);
-        await redraw(sessionPlayerId(roster.players), true, btn.closest("article.day") && btn.closest("article.day").dataset.date);
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-  });
-  const clear = document.getElementById("clear-lock");
-  if (clear) {
-    clear.addEventListener("click", async () => {
-      await api.send("/api/lock-night", "POST", { kind: clear.dataset.kind || page.kind, clear: true });
-      await redraw(sessionPlayerId(roster.players), true);
-    });
-  }
   const date = new URLSearchParams((location.hash.split("?")[1] || "")).get("date");
   const next = date ? null : firstWindowOffer(avail);
   const card = (date && document.querySelector(`article.day[data-date="${date}"]`))
@@ -541,6 +630,10 @@ function bindAvailability(roster, skipAsk, kind, avail) {
     });
   }
   layoutDayCards();
+  if (date) {
+    const dia = document.getElementById("avail-diamond");
+    if (dia && dia.dataset.day) dia.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   window.availPollGen = (window.availPollGen || 0) + 1;
   const pollGen = window.availPollGen;
   if (window.availTimer) clearInterval(window.availTimer);

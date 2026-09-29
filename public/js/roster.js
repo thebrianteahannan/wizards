@@ -259,12 +259,12 @@ function fieldLayout(players, pitcherId) {
   const FIELD = ["CF", "LF", "3B", "SS", "2B"];
   const IF_FIRST = ["3B", "SS", "2B", "CF", "LF"];
   const spots = [
-    { key: "CF", left: "50%", top: "8%" },
-    { key: "LF", left: "18%", top: "20%" },
-    { key: "3B", left: "18%", top: "54%" },
-    { key: "SS", left: "42%", top: "36%" },
-    { key: "2B", left: "82%", top: "36%" },
-    { key: "P", left: "50%", top: "70%" },
+    { key: "CF", left: "50%", top: "5%" },
+    { key: "LF", left: "12%", top: "18%" },
+    { key: "3B", left: "12%", top: "58%" },
+    { key: "SS", left: "30%", top: "36%" },
+    { key: "2B", left: "74%", top: "36%" },
+    { key: "P", left: "50%", top: "62%" },
   ];
   const pitcher = players.find((p) => p.id === pitcherId) || pitcherArms(players)[0];
   const extras = pitcherArms(players).filter((p) => !pitcher || p.id !== pitcher.id);

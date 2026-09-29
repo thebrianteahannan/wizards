@@ -19,6 +19,7 @@ const routes = {
   "/team": "team",
   "/scout": "scout",
   "/tourney-scout": "tourney-scout",
+  "/overall-scout": "overall-scout",
   "/overview": "overview",
 };
 
@@ -27,7 +28,7 @@ async function load() {
   const hash = (location.hash.replace(/^#/, "") || "/").split("?")[0];
   const route = routes[hash] || "home";
   syncGates();
-  const teamPages = ["team", "board", "availability", "tournament", "scout", "tourney-scout", "overview", "practice", "gear", "join", "recruits", "dues", "strategy"];
+  const teamPages = ["team", "board", "availability", "tournament", "scout", "tourney-scout", "overall-scout", "overview", "practice", "gear", "join", "recruits", "dues", "strategy"];
   document.querySelectorAll(".nav a").forEach((a) => {
     const href = a.getAttribute("href");
     const onTeam = href === "#/team" && teamPages.includes(route);
@@ -196,6 +197,19 @@ async function load() {
           app.innerHTML = renderTourneyScout(data, team, event);
           bindTourneyScout(data.event || event);
         }
+      }
+    } else if (route === "overall-scout") {
+      if (!isTeam()) {
+        app.innerHTML = renderLock("team");
+        bindPageLock("team");
+      } else {
+        const [league, tourney] = await Promise.all([
+          api.get("/api/plw-league"),
+          api.get("/api/plw-tourney?event=overall"),
+        ]);
+        const team = new URLSearchParams(location.hash.split("?")[1] || "").get("team");
+        app.innerHTML = renderOverallScout(league, tourney, team);
+        bindOverall();
       }
     } else if (route === "overview") {
       location.hash = "#/scout";

@@ -113,20 +113,29 @@ function scoutRated(rows, scoreOf, toneOf, keys, empty, title, dir, pool, team, 
       const grade = score == null ? `<span class="muted">—</span>` : `<b style="${toneOf(score)}">${score}${tourneyStar(team, row) ? "*" : ""}</b>`;
       const marks = scoutExtremes(row, keys, dir, pool || rows);
       const dim = active && active.length && !oursHit(row, active) ? ";opacity:0.4" : "";
+      const ours = team && team.code === "WIZ" ? ' style="color:var(--cyan)"' : "";
       return `<div class="roster-row" style="grid-template-columns:3.2rem 8.4rem minmax(0,1fr);align-items:center${dim}">
         <span class="num" title="${escapeHtml(title)}">${grade}</span>
-        <strong>${escapeHtml(row.name || [row.first, row.last].filter(Boolean).join(" "))}</strong>
+        <strong${ours}>${escapeHtml(row.name || [row.first, row.last].filter(Boolean).join(" "))}</strong>
         <div class="muted" style="overflow-x:auto;white-space:nowrap;font-size:0.72rem">${scoutTags(row, keys, marks)}</div>
       </div>`;
     })
     .join("");
 }
 
+function depthPack(team, pit) {
+  return [6, 9, 12].map((n) => {
+    const s = (team.batters || []).map(hitterRating).filter((x) => x != null).sort((a, b) => b - a);
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += i < s.length ? s[i] : 40;
+    const bat = Math.round(sum / n);
+    return { n, bat, have: Math.min(s.length, n), all: pit != null ? Math.round(0.55 * bat + 0.45 * pit) : bat };
+  });
+}
 function rankedTeams(teams) {
   const pitFill = leaguePitAvg(teams);
-  return (teams || [])
-    .slice()
-    .sort((a, b) => (teamMarks(b, pitFill).all || 0) - (teamMarks(a, pitFill).all || 0) || a.name.localeCompare(b.name));
+  const grade = (t) => depthPack(t, teamMarks(t, pitFill).pit)[2].all || 0;
+  return (teams || []).slice().sort((a, b) => grade(b) - grade(a) || a.name.localeCompare(b.name));
 }
 
 function scoutMenu(teams, code) {
@@ -161,9 +170,8 @@ function scoutPane(team, pitFill, book, onlyNames, active) {
       <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:0.7rem;margin:0 0 0.55rem">
         <h2 style="margin:0">${escapeHtml(team.name)}</h2>
         <div style="display:flex;gap:0.9rem">
-          <span class="num" title="Hitting"><small class="muted" style="display:block;font-size:0.62rem">BAT</small>${markCell(marks.bat, marks.starBat)}</span>
+          ${depthPack(team, marks.pit).map((c) => `<span class="num" title="Best ${c.n} hitters. ${c.have} posted, open spots count as 40."><small class="muted" style="display:block;font-size:0.62rem">${c.n}</small>${markCell(c.bat, marks.starBat)}<small class="muted" style="display:block;font-size:0.62rem">ALL ${c.all}</small></span>`).join("")}
           <span class="num" title="Pitching"><small class="muted" style="display:block;font-size:0.62rem">PIT</small>${markCell(marks.pit, marks.starPit)}</span>
-          <span class="num" title="Overall"><small class="muted" style="display:block;font-size:0.62rem">ALL</small>${markCell(marks.all)}</span>
         </div>
       </div>
       ${note ? `<p class="muted" style="margin:0 0 0.55rem">${escapeHtml(note)}</p>` : ""}
@@ -172,7 +180,7 @@ function scoutPane(team, pitFill, book, onlyNames, active) {
       <p class="kicker" style="margin:1rem 0 0.35rem">Pitching</p>
       <div class="roster-list">${scoutRated(onlyNames ? (team.pitchers || []).filter((r) => oursHit(r, onlyNames)) : team.pitchers || [], pitchRating, pitchTone, SCOUT_PIT, "No pitching lines posted.", "Pitch rating", PIT_DIR, arms, team, onlyNames ? null : active)}</div>
       <p class="muted" style="margin:0.55rem 0 0">Green is a top skill vs the league. Pink is a weak one. Up to three of each.</p>
-    </div>`;
+    </div><div id="game-log" data-team="${escapeHtml(team.code)}" style="margin-top:1rem"></div>`;
 }
 
 function renderScout(data, code) {
@@ -184,7 +192,7 @@ function renderScout(data, code) {
   return `
     <p class="kicker">Locker room</p>
     <h1>League Stats &amp; Analysis</h1>
-    <p class="lede">${escapeHtml((data && data.note) || "Florida Challengers League stats by team.")} Hitting is weighted by at-bats. Pitching is weighted by innings. Overall is 55% bats / 45% arms. * Wizards: tourney bats and arms. <a href="#/tourney-scout?event=historical">Historical leagues</a>. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
+    <p class="lede">${escapeHtml((data && data.note) || "Florida Challengers League stats by team.")} 6, 9, and 12 are the hitting grade of the best hitters at that depth. Open roster spots count as 40. * Wizards: tourney bats and arms. <a href="#/overall-scout">Overall stats</a>. <a href="#/tourney-scout?event=historical">Historical leagues</a>. <a href="${escapeHtml(href)}" target="_blank" rel="noopener">MyStatsOnline</a></p>
     <div class="actions" data-scout-menu style="margin-top:0.7rem">${menu}</div>
     <div id="scout-pane" style="margin-top:1rem">${pick ? scoutPane(pick, pitFill, data && data.teams) : overviewPane(data)}</div>
     <div class="actions" data-scout-menu style="margin-top:1rem">${menu}</div>
@@ -198,7 +206,8 @@ function bindScout() {
       location.hash = code === "overview" ? "#/scout" : "#/scout?team=" + encodeURIComponent(code);
     });
   });
-  if (typeof bindClubSheets === "function") bindClubSheets();
+  if (typeof bindLeaderToggle === "function") bindLeaderToggle();
+  if (typeof bindClubSheets === "function") bindClubSheets(); if (typeof loadGameLog === "function") loadGameLog();
 }
 
 function weightedScore(rows, scoreOf, weightOf) {
@@ -241,69 +250,64 @@ function markCell(n, star) {
   return `<b style="${ratingTone(n)}">${n}${star ? "*" : ""}</b>`;
 }
 
-function topLeaders(teams, kind, scoreOf, toneOf) {
+function topLeaders(teams, kind, scoreOf, toneOf, keep) {
   const all = [];
-  for (const t of teams || []) {
-    for (const r of t[kind] || []) {
-      const s = scoreOf(r);
-      if (s != null) all.push({ r, s, team: t });
-    }
+  for (const t of teams || []) for (const r of t[kind] || []) {
+    if (keep && !keep(r)) continue;
+    const s = scoreOf(r);
+    if (s != null) all.push({ r, s, team: t });
   }
   all.sort((a, b) => b.s - a.s);
-  const top = all.slice(0, 10);
-  const cut = top[9];
-  const next = all.find((x) => x.team.code === "WIZ" && !top.includes(x));
-  if (next) {
-    next.how = cut && next.s >= cut.s - 2 ? "close" : "far";
-    top.push(next);
-  }
+  const next = all.find((x, i) => i >= 10 && x.team.code === "WIZ");
   const cols = "2.2rem 2.8rem minmax(0,1fr) 6.4rem";
-  return (
-    top
-      .map((x) => {
-        const n = x.r.name || [x.r.first, x.r.last].filter(Boolean).join(" ");
-        const us = x.team.code === "WIZ";
-        const glow = !us ? "" : x.how === "far" ? ";border-style:dashed;border-color:rgba(154,168,199,0.35)" : x.how === "close" ? ";border-color:var(--gold);box-shadow:0 0 10px rgba(240,193,75,0.22)" : ";border-color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,0.28)";
-        const name = !us ? "" : x.how === "far" ? ' style="color:var(--muted)"' : x.how === "close" ? ' style="color:var(--gold)"' : ' style="color:var(--cyan)"';
-        return `<div class="roster-row" style="grid-template-columns:${cols}${glow}"><span class="num">${all.indexOf(x) + 1}</span><span class="num"><b style="${toneOf(x.s)}">${x.s}${tourneyStar(x.team, x.r) ? "*" : ""}</b></span><strong${name}>${escapeHtml(n)}</strong><span class="muted">${escapeHtml(x.team.name)}</span></div>`;
-      })
-      .join("") || `<p class="muted">—</p>`
-  );
+  return all.map((x, i) => {
+    const n = x.r.name || [x.r.first, x.r.last].filter(Boolean).join(" ");
+    const us = x.team.code === "WIZ";
+    const glow = us ? ";border-color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,0.28)" : "";
+    const name = us ? ' style="color:var(--cyan)"' : "";
+    const rest = i >= 10 && x !== next ? " data-leader-rest" : "";
+    return `<div class="roster-row"${rest} style="${rest ? "display:none;" : ""}grid-template-columns:${cols}${glow}"><span class="num">${i + 1}</span><span class="num"><b style="${toneOf(x.s)}">${x.s}${tourneyStar(x.team, x.r) ? "*" : ""}</b></span><strong${name}>${escapeHtml(n)}</strong><span class="muted">${escapeHtml(x.team.name)}</span></div>`;
+  }).join("") || `<p class="muted">—</p>`;
 }
 
-function overviewPane(data) {
+function overviewPane(data, hrefFor) {
   const list = (data && data.teams) || [];
   const pitFill = leaguePitAvg(list);
-  const teams = rankedTeams(list).map((t) => ({ team: t, marks: teamMarks(t, pitFill) }));
-  const cols = "2.2rem minmax(0,1fr) 3.2rem 3.2rem 3.2rem";
+  const teams = rankedTeams(list).map((t) => {
+    const marks = teamMarks(t, pitFill);
+    return { team: t, marks, cuts: depthPack(t, marks.pit) };
+  });
+  const cols = "2.2rem minmax(0,1fr) 2.2rem 2.2rem 2.2rem 2.4rem 2.6rem";
   const head = `<div class="roster-row" style="grid-template-columns:${cols}">
-    <span class="muted">#</span><span class="muted" style="text-align:left">Team</span><span class="num muted">BAT</span><span class="num muted">PIT</span><span class="num muted">ALL</span>
+    <span class="muted">#</span><span class="muted" style="text-align:left">Team</span><span class="num muted">6</span><span class="num muted">9</span><span class="num muted">12</span><span class="num muted">PIT</span><span class="num muted">ALL</span>
   </div>`;
   const rows = teams
     .map((row, i) => {
       const t = row.team;
       const us = t.code === "WIZ";
       const glow = us ? ";border-color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,0.28)" : "";
-      return `<a class="roster-row" href="#/scout?team=${encodeURIComponent(t.code)}" style="grid-template-columns:${cols};text-decoration:none;color:inherit${glow}">
+      const cuts = row.cuts.map((c) => `<span class="num" title="Best ${c.n} hitters. ${c.have} posted, open spots count as 40. Overall ${c.all}.">${markCell(c.bat, row.marks.starBat)}</span>`).join("");
+      const href = hrefFor ? hrefFor(t.code) : "#/scout?team=" + encodeURIComponent(t.code);
+      return `<a class="roster-row" href="${href}" style="grid-template-columns:${cols};text-decoration:none;color:inherit${glow}">
         <span class="num">${i + 1}</span>
         <span style="text-align:left"><strong${us ? ' style="color:var(--cyan)"' : ""}>${escapeHtml(t.name)}</strong></span>
-        <span class="num" title="Hitting">${markCell(row.marks.bat, row.marks.starBat)}</span>
+        ${cuts}
         <span class="num" title="Pitching">${markCell(row.marks.pit, row.marks.starPit)}</span>
-        <span class="num" title="Overall">${markCell(row.marks.all)}</span>
+        <span class="num" title="55% best 12 hitters, 45% pitching">${markCell(row.cuts[2].all)}</span>
       </a>`;
     })
     .join("");
   return `
     <div class="diamond-card card">
       <p class="kicker">Board</p>
-      <h2 style="margin:0 0 0.55rem">Overview</h2>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.5rem;margin:0 0 0.55rem"><h2 style="margin:0">Overview</h2><button class="btn ghost" type="button" data-leaders-all style="padding:0.28rem 0.7rem;font-size:0.72rem">All bats &amp; arms</button></div>
       <div class="grid-3">
         <div><p class="kicker" style="margin:0 0 0.35rem">Clubs</p><div class="roster-list">${head}${rows || '<p class="muted">No league lines posted yet.</p>'}</div></div>
-        <div><p class="kicker" style="margin:0 0 0.35rem">Top bats</p><div class="roster-list">${topLeaders(list, "batters", hitterRating, ratingTone)}</div></div>
-        <div><p class="kicker" style="margin:0 0 0.35rem">Top arms</p><div class="roster-list">${topLeaders(list, "pitchers", pitchRating, pitchTone)}</div></div>
+        <div><p class="kicker" style="margin:0 0 0.35rem" title="Slugging is at least .200 above batting average">Power</p><div class="roster-list">${topLeaders(list, "batters", hitterRating, ratingTone, (r) => (scoutNum(r.slg) || 0) - (scoutNum(r.avg) || 0) >= 0.2)}</div><p class="kicker" style="margin:0.7rem 0 0.35rem" title="Hits are mostly singles">Base</p><div class="roster-list">${topLeaders(list, "batters", hitterRating, ratingTone, (r) => (scoutNum(r.slg) || 0) - (scoutNum(r.avg) || 0) < 0.2)}</div></div>
+        <div><p class="kicker" style="margin:0 0 0.35rem" title="At least 40% of appearances are starts">Starters</p><div class="roster-list">${topLeaders(list, "pitchers", pitchRating, pitchTone, (r) => (Number(r.gs) || 0) > 0 && (Number(r.gs) || 0) * 5 >= (Number(r.g) || 0) * 2)}</div><p class="kicker" style="margin:0.7rem 0 0.35rem" title="Starts are under 40% of appearances">Relievers</p><div class="roster-list">${topLeaders(list, "pitchers", pitchRating, pitchTone, (r) => !((Number(r.gs) || 0) > 0 && (Number(r.gs) || 0) * 5 >= (Number(r.g) || 0) * 2))}</div></div>
       </div>
       ${typeof winTrackHtml === "function" ? winTrackHtml(list) : ""}
-      <p class="muted" style="margin:0.55rem 0 0">* Wizards: tourney hitting and pitching. Cyan made the top 10. We always tack on our next bat and arm. Gold is tied or within 2 of 10th. Dim dashed is further back.</p>
+      <p class="muted" style="margin:0.55rem 0 0">* Wizards: tourney hitting and pitching. Cyan is a Wizards player. We always tack on our next power bat, base bat, starter, and reliever.</p>
     </div>
   `;
 }
@@ -315,7 +319,7 @@ function matchupFavor(offer, book) {
   const us = book.find((t) => t.code === "WIZ");
   const them = matchScoutTeam(book, name);
   if (!us || !them) return null;
-  return favorScore(teamMarks(us, pitFill), teamMarks(them, pitFill));
+  return favorScore(lineupMarks(us, pitFill), lineupMarks(them, pitFill));
 }
 
 function opponentName(offer) {
@@ -398,9 +402,14 @@ function vsBoard(label, ours, theirs, fn, us, themName, theirNames) {
   return `<div style="margin-top:0.7rem"><div style="display:grid;grid-template-columns:${cols};gap:0.5rem;padding:0 0.65rem 0.2rem"><span class="kicker" style="margin:0">Our ${escapeHtml(label)}</span><span></span><span class="num muted">+/-</span><span></span><span class="kicker" style="margin:0;text-align:right">${escapeHtml(themName)} ${escapeHtml(label)}</span></div><div class="roster-list">${rows}</div></div>`;
 }
 
+function lineupMarks(team, pitFill) {
+  const m = teamMarks(team, pitFill), top = depthPack(team, m.pit)[0];
+  return { ...m, bat: top.bat, all: top.all };
+}
+
 function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames, lineup, offer) {
-  const um = teamMarks(us, pitFill);
-  const tm = teamMarks(them, pitFill);
+  const um = lineupMarks(us, pitFill);
+  const tm = lineupMarks(them, pitFill);
   const fav = favorScore(um, tm);
   const posted = (lineup && lineup.names) || [];
   const tips = beatTips(us, them, um, tm, usRank, themRank, book, { lineup: posted, oursNames })
@@ -428,7 +437,7 @@ function renderMatchup(us, them, usRank, themRank, pitFill, book, oursNames, lin
       </div>
       <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:0.85rem 1.4rem"><div class="roster-list">
         <div class="roster-row" style="grid-template-columns:${cols};justify-content:start;max-width:26rem">
-          <span class="muted">Club</span><span class="num muted">W-L</span><span class="num muted">BAT</span><span class="num muted">PIT</span><span class="num muted">ALL</span><span class="num muted">RK</span>
+          <span class="muted">Club</span><span class="num muted">W-L</span><span class="num muted" title="Best 6 hitters. Open spots count as 40.">BAT</span><span class="num muted">PIT</span><span class="num muted" title="Best 6 hitters with pitching.">ALL</span><span class="num muted">RK</span>
         </div>
         ${line(us, um, usRank, true)}
         ${line(them, tm, themRank, false)}

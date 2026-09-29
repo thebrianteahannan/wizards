@@ -212,6 +212,41 @@ function calPillBits(e, packs) {
   };
 }
 
+function blankScore(g) {
+  if (!g || g.us == null) return true;
+  const us = Number(g.us) || 0;
+  const them = Number(g.them) || 0;
+  if (us !== 0 || them !== 0) return false;
+  const usE = g.eUs != null ? g.eUs : g.e;
+  const themE = g.eThem;
+  return (usE == null || Number(usE) === 0) && (themE == null || Number(themE) === 0);
+}
+
+function lockedNightTag(date, packs) {
+  const locked = (matchPack(packs) || {}).lockedNight;
+  if (!locked || String(locked.day) !== String(date)) return "";
+  const who = locked.lockedBy ? "Locked in · " + locked.lockedBy : "Locked in";
+  return `<span class="tag cal-result locked" title="${escapeHtml(who)}">Locked in</span>`;
+}
+
+function scoreTags(e, seen, keepBlank) {
+  return (e.games || [])
+    .map((g) => {
+      if (!g || g.us == null) return "";
+      if (!keepBlank && blankScore(g)) return "";
+      const key = g.id || g.n + ":" + g.us + "-" + g.them + ":" + g.opp;
+      if (seen.has(key)) return "";
+      seen.add(key);
+      const tone = g.mark === "W" ? "win" : g.mark === "L" ? "loss" : "tie";
+      const tip = [g.opp, g.ab != null ? "AB " + g.ab : "", g.h != null ? "H " + g.h : "", g.bb != null ? "BB " + g.bb : "", gameErrLabel(g)]
+        .filter(Boolean)
+        .join(" · ");
+      const ebit = gameErrLabel(g, "short");
+      return `<span class="tag cal-result ${tone}" title="${escapeHtml(tip)}">${escapeHtml((g.mark || "") + " " + g.us + "-" + g.them + ebit)}</span>`;
+    })
+    .join("");
+}
+
 function calDayTags(hits, packs) {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -220,20 +255,17 @@ function calDayTags(hits, packs) {
     .map((e) => {
       const rec = eventRecord(e);
       if (e.games && e.games.some((g) => g && g.us != null)) {
-        return e.games
-          .map((g) => {
-            if (g.us == null) return "";
-            const key = g.id || g.n + ":" + g.us + "-" + g.them + ":" + g.opp;
-            if (seen.has(key)) return "";
-            seen.add(key);
-            const tone = g.mark === "W" ? "win" : g.mark === "L" ? "loss" : "tie";
-            const tip = [g.opp, g.ab != null ? "AB " + g.ab : "", g.h != null ? "H " + g.h : "", g.bb != null ? "BB " + g.bb : "", gameErrLabel(g)]
-              .filter(Boolean)
-              .join(" · ");
-            const ebit = gameErrLabel(g, "short");
-            return `<span class="tag cal-result ${tone}" title="${escapeHtml(tip)}">${escapeHtml((g.mark || "") + " " + g.us + "-" + g.them + ebit)}</span>`;
-          })
-          .join("");
+        const played = e.status === "played" || (e.date && e.date < today);
+        if (played) {
+          const tags = scoreTags(e, seen, true);
+          if (tags) return tags;
+        } else if (e.games.every((g) => !g || g.us == null || blankScore(g))) {
+          const lock = lockedNightTag(e.date, packs);
+          if (lock) return lock;
+        } else {
+          const tags = scoreTags(e, seen, false);
+          if (tags) return tags;
+        }
       }
       if (rec) {
         const tone = rec.mark === "W" ? "win" : rec.mark === "L" ? "loss" : "tie";

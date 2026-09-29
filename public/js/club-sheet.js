@@ -49,7 +49,7 @@ function clubSortBtn(key, label, tip, extra) {
   return `<button type="button" class="club-sort${extra || ""}" data-club-sort="${escapeHtml(key)}" title="${escapeHtml(tip)} · Click to sort">${escapeHtml(label)}</button>`;
 }
 
-function clubStatTable(teams, title, keys, bagOf, colW) {
+function clubStatTable(teams, title, keys, bagOf, colW, sheetMin) {
   const w = colW || "2.8rem";
   const cols = `minmax(7.5rem,1fr) 4.6rem ${keys.map(() => w).join(" ")}`;
   const cell = (html) => `<span class="num" style="min-width:auto;white-space:nowrap">${html}</span>`;
@@ -68,7 +68,8 @@ function clubStatTable(teams, title, keys, bagOf, colW) {
         .join("")}</div>`;
     })
     .join("");
-  return `<div style="margin-top:0.85rem;overflow-x:auto"><p class="kicker" style="margin:0 0 0.35rem">${escapeHtml(title)}</p><div class="roster-list" data-club-sheet style="min-width:42rem">${head}${rows}</div></div>`;
+  const minW = sheetMin || "42rem";
+  return `<div style="margin-top:0.85rem;overflow-x:auto"><p class="kicker" style="margin:0 0 0.35rem">${escapeHtml(title)}</p><div class="roster-list" data-club-sheet style="min-width:${minW}">${head}${rows}</div></div>`;
 }
 
 function clubSection(title, tables, split) {
@@ -105,25 +106,31 @@ function clubSheetsHtml(teams) {
       };
     }
   );
-  const hittingRates = clubStatTable(
+  const hittingPerWin = clubStatTable(
     teams,
-    "Per win and per game",
+    "Per win",
+    [{ key: "rsw", label: "RS/W", tip: "Average runs scored in wins", digits: 1 }],
+    (t) => ({ rsw: winRate(t.boxRsWin, t.boxWins) }),
+    "3.2rem",
+    "16rem"
+  );
+  const hittingPerGame = clubStatTable(
+    teams,
+    "Per game",
     [
-      { key: "rsw", label: "RS/W", tip: "Average runs scored in wins", digits: 1 },
       { key: "h", label: "H/G", tip: "Hits per game", digits: 1 },
       { key: "doubles", label: "2B/G", tip: "Doubles per game", digits: 1 },
       { key: "triples", label: "3B/G", tip: "Triples per game", digits: 1 },
       { key: "hr", label: "HR/G", tip: "Home runs per game", digits: 1 },
       { key: "r", label: "R/G", tip: "Runs scored per game", digits: 1 },
       { key: "bb", label: "BB/G", tip: "Walks per game", digits: 1 },
-      { key: "e", label: "E/G", tip: "Reached on error per game", digits: 1 },
+      { key: "e", label: "FE/G", tip: "Reached on error per game", digits: 1 },
     ],
     (t) => {
       const b = t.batters || [];
       const gp = clubGames(t);
       const r = bagSum(b, "r") || t.rs || 0;
       return {
-        rsw: winRate(t.boxRsWin, t.boxWins),
         h: perGame(bagSum(b, "h"), gp),
         doubles: perGame(bagSum(b, "doubles"), gp),
         triples: perGame(bagSum(b, "triples"), gp),
@@ -144,7 +151,6 @@ function clubSheetsHtml(teams) {
       { key: "triples", label: "3B", tip: "Triples allowed — not posted on the PLW pitcher board" },
       { key: "hr", label: "HR", tip: "Home runs allowed" },
       { key: "r", label: "R", tip: "Runs allowed" },
-      { key: "e", label: "E", tip: "Fielding errors from the line score" },
       { key: "so", label: "SO", tip: "Strikeouts" },
       { key: "bb", label: "BB", tip: "Walks issued" },
     ],
@@ -156,23 +162,28 @@ function clubSheetsHtml(teams) {
         triples: null,
         hr: bagSum(p, "hr"),
         r: bagSum(p, "r") || t.ra || 0,
-        e: pitchE(t),
         so: bagSum(p, "so"),
         bb: bagSum(p, "bb"),
       };
     }
   );
-  const pitchingRates = clubStatTable(
+  const pitchingPerWin = clubStatTable(
     teams,
-    "Per win and per game",
+    "Per win",
+    [{ key: "raw", label: "RA/W", tip: "Average runs allowed in wins", digits: 1 }],
+    (t) => ({ raw: winRate(t.boxRaWin, t.boxWins) }),
+    "3.2rem",
+    "16rem"
+  );
+  const pitchingPerGame = clubStatTable(
+    teams,
+    "Per game",
     [
-      { key: "raw", label: "RA/W", tip: "Average runs allowed in wins", digits: 1 },
       { key: "h", label: "H/G", tip: "Hits allowed per game", digits: 1 },
       { key: "doubles", label: "2B/G", tip: "Doubles allowed per game — not posted by PLW", digits: 1 },
       { key: "triples", label: "3B/G", tip: "Triples allowed per game — not posted by PLW", digits: 1 },
       { key: "hr", label: "HR/G", tip: "Home runs allowed per game", digits: 1 },
       { key: "r", label: "R/G", tip: "Runs allowed per game", digits: 1 },
-      { key: "e", label: "E/G", tip: "Fielding errors per game from the line score", digits: 1 },
       { key: "so", label: "SO/G", tip: "Strikeouts per game", digits: 1 },
       { key: "bb", label: "BB/G", tip: "Walks issued per game", digits: 1 },
     ],
@@ -181,23 +192,38 @@ function clubSheetsHtml(teams) {
       const gp = clubGames(t);
       const r = bagSum(p, "r") || t.ra || 0;
       return {
-        raw: winRate(t.boxRaWin, t.boxWins),
         h: perGame(bagSum(p, "h"), gp),
         doubles: null,
         triples: null,
         hr: perGame(bagSum(p, "hr"), gp),
         r: perGame(r, gp),
-        e: pitchEG(t),
         so: perGame(bagSum(p, "so"), gp),
         bb: perGame(bagSum(p, "bb"), gp),
       };
     },
     "3.2rem"
   );
+  const fieldingTotals = clubStatTable(
+    teams,
+    "Totals",
+    [{ key: "e", label: "E", tip: "Fielding errors from the line score" }],
+    (t) => ({ e: pitchE(t) }),
+    "3.2rem",
+    "16rem"
+  );
+  const fieldingPerGame = clubStatTable(
+    teams,
+    "Per game",
+    [{ key: "e", label: "E/G", tip: "Fielding errors per game from the line score", digits: 1 }],
+    (t) => ({ e: pitchEG(t) }),
+    "3.2rem",
+    "16rem"
+  );
   return (
-    clubSection("Hitting", hittingTotals + hittingRates) +
-    clubSection("Pitching", pitchingTotals + pitchingRates, true) +
-    `<p class="muted" style="margin:0.55rem 0 0">Hitting FE and E/G are reached on error. Pitching E and E/G are fielding errors from the line score. RS/W is average runs scored in wins; RA/W is average runs allowed in wins. /G is per game. Click a column header to sort. PLW pitcher pages do not post doubles or triples allowed.</p>`
+    clubSection("Hitting", hittingTotals + hittingPerWin + hittingPerGame) +
+    clubSection("Pitching", pitchingTotals + pitchingPerWin + pitchingPerGame, true) +
+    clubSection("Fielding", fieldingTotals + fieldingPerGame, true) +
+    `<p class="muted" style="margin:0.55rem 0 0">Hitting FE and FE/G are reached on error. Fielding E and E/G are errors from the line score. RS/W is average runs scored in wins; RA/W is average runs allowed in wins. /G is per game. Click a column header to sort. PLW pitcher pages do not post doubles or triples allowed.</p>`
   );
 }
 

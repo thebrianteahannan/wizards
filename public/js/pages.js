@@ -34,7 +34,7 @@ function renderHome(roster, schedule, avail, fees, tourneyAvail, stats) {
     ? `<article class="card"><p class="kicker">Availability pulse</p><h2>${best && best.yes >= 6 ? "We can field a night" : "Still hunting a night"}</h2><p>${best ? `<span class="${best.yes >= 6 ? "ok" : "warn"}">${best.yes} yes / ${best.maybe} maybe</span> on ${cap(best.day)} ${best.window}` : "Nobody has filled nights yet. Grab League and tap your week."}</p><p class="muted">Fall league is flexible weeknights and weekends until the lights are fully in.</p></article>`
     : `<article class="card"><p class="kicker">Club only</p><h2>Team tools stay locked</h2><p class="muted">League, announcements, and dues open with the team password in the header.</p></article>`;
   return `
-    ${team && locked ? `<div class="banner"><strong>League locked:</strong> ${escapeHtml(cap(locked.day))} ${escapeHtml(locked.window)} — set by ${escapeHtml(locked.lockedBy)}</div>` : ""}
+    ${team && locked ? `<a class="banner" href="#/availability?date=${encodeURIComponent(locked.day)}"><strong>League locked:</strong> ${escapeHtml(cap(locked.day))} ${escapeHtml(locked.window)}</a>` : ""}
     <section class="hero">
       <div class="hero-copy">
         <p class="kicker">Florida Challengers League · Fall 2026</p>
@@ -404,6 +404,7 @@ function renderTeamHub(favTag, tourneyTag, pracTag, rankTag, tRankTag, recruitTa
     ["#/availability", "◷", "Match days", "League nights and tournaments. Need 6 yes at the same time.", ["Set your days", favTag, tourneyTag].filter(Boolean)],
     ["#/scout", "▦", "League Stats & Analysis", "Overview and every Challengers club.", rankTag],
     ["#/tourney-scout", "▣", "Tournament Stats & Analysis", "Each event, plus hitting and pitching by club.", tRankTag],
+    ["#/overall-scout", "◉", "Overall Stats & Analysis", "League and tournament lines added together.", ""],
     ["#/join", "+", "Recruit", "Put someone in the book.", recruitTag],
     ["#/recruits", "☰", "Recruits", "Inbox, contact, move onto the roster.", queueTag],
     ["#/dues", "$", "Dues", "Who paid and what they owe."],

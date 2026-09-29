@@ -9,22 +9,52 @@ const TEAM_URL =
   "https://www.mystatsonline.com/ballsports/visitor/league/stats/team.aspx?IDLeague=" +
   LEAGUE +
   "&IDSeason=";
+const SCHEDULE_URL = "https://www.mystatsonline.com/ballsports/visitor/league/schedule_scores/schedule.aspx?IDLeague=" + LEAGUE + "&IDSeason=";
 const MO = "January,February,March,April,May,June,July,August,September,October,November,December".split(",");
 
 let cache = { at: 0, byId: {}, sides: {} };
 let fieldCache = {};
 const TEAM_IDS = [228246, 131104, 228242, 228245, 228493, 228247, 228239, 130071, 228240, 130404, 229625];
 
-async function fetchHtml(url) {
+async function fetchHtml(url, body) {
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), 12000);
+  const timer = setTimeout(() => ac.abort(), body ? 25000 : 12000);
   try {
-    const res = await fetch(url, { signal: ac.signal, headers: { "user-agent": "WizardsHub/1.0" } });
+    const res = await fetch(url, {
+      method: body ? "POST" : "GET",
+      signal: ac.signal,
+      headers: { "user-agent": "WizardsHub/1.0", ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}) },
+      body: body || undefined,
+    });
     if (!res.ok) throw new Error("PLW box " + res.status);
     return await res.text();
   } finally {
     clearTimeout(timer);
   }
+}
+
+function formValue(html, id) {
+  const tag = String(html || "").match(new RegExp("<input[^>]*id=\"" + id + "\"[^>]*>", "i"));
+  return (tag && (tag[0].match(/value="([^"]*)"/i) || [])[1]) || "";
+}
+
+async function scheduleGameIds(season, teamId) {
+  const url = SCHEDULE_URL + season;
+  const first = await fetchHtml(url);
+  const body = new URLSearchParams({
+    __EVENTTARGET: "ctl00$maincontent$ddlMonth",
+    __EVENTARGUMENT: "",
+    __VIEWSTATE: formValue(first, "__VIEWSTATE"),
+    __VIEWSTATEGENERATOR: formValue(first, "__VIEWSTATEGENERATOR"),
+    __EVENTVALIDATION: formValue(first, "__EVENTVALIDATION"),
+    "ctl00$maintitle$ddlSeason": String(season),
+    "ctl00$maincontent$ddlMonth": "0",
+    "ctl00$maincontent$ddlStatus": "-1",
+    "ctl00$maincontent$ddlLocation": "0",
+    "ctl00$maincontent$ddlTeam": String(teamId),
+  }).toString();
+  const html = await fetchHtml(url, body);
+  return [...new Set([...String(html).matchAll(/href="game_score\.aspx\?IDLeague=\d+(?:&|&amp;)IDGame=(\d+)"/g)].map((m) => m[1]))];
 }
 
 function plain(html) {
@@ -322,4 +352,148 @@ function applyFielding(teams, byCode) {
   return teams;
 }
 
-module.exports = { attachGameLines, parseBox, loadBoxes, foldSameDay, fieldingTotals, applyFielding };
+const GAME_TEAMS = {
+  WIZ: ["Wizards", 228246],
+  FLM: ["Flamingos", 228242],
+  RPR: ["Reapers", 228245],
+  GUN: ["Gunslingers", 228493],
+  SVG: ["Savages", 228247],
+  BTZ: ["Blitz", 228239],
+  SAN: ["Sandvipers", 130071],
+  SMG: ["Smugglers", 228240],
+  WAR: ["Warbirds", 130404],
+  LEV: ["Leviathans", 229625],
+  BSD: ["Balls Deep", 228249],
+  CLS: ["Cloud Seeders", 228244],
+  KNU: ["Knuckled Up", 228241],
+  MRD: ["Marauders", 228248],
+  WST: ["Wiffle Shts", 228243],
+};
+const BAT_KEYS = ["avg", "slg", "obp", "ab", "r", "h", "singles", "doubles", "triples", "hr", "rbi", "tb", "so", "bb", "sf", "tpa", "roe", "ops", "fc"];
+const PIT_KEYS = ["w", "l", "sv", "era", "ip", "h", "r", "er", "bb", "so", "hr", "bf", "gs", "cg", "sho", "avg", "whip", "sox", "bbx"];
+const gameNames = Object.fromEntries(Object.entries(GAME_TEAMS).map(([code, row]) => [code, row[0]]));
+let gameLogCache = {};
+
+function statN(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function innings(v) {
+  const parts = String(v == null ? "" : v).split(".");
+  return (Number(parts[0]) || 0) + (Number(parts[1]) || 0) / 3;
+}
+
+function hitRate(row) {
+  const tpa = statN(row.tpa);
+  if (tpa < 1) return null;
+  const disc = Math.max(-0.25, Math.min(0.4, (statN(row.bb) - statN(row.so)) / tpa));
+  const raw = 0.38 * statN(row.obp) + 0.32 * statN(row.slg) + 0.15 * statN(row.avg) + 0.15 * disc;
+  return Math.max(1, Math.min(99, Math.round(raw * 170)));
+}
+
+function pitRate(row) {
+  const ip = innings(row.ip);
+  if (ip <= 0) return null;
+  const era = Math.max(0, Math.min(1, 1 - statN(row.era) / 10));
+  const whip = Math.max(0, Math.min(1, 1 - statN(row.whip) / 3));
+  const so = Math.max(0, Math.min(1, statN(row.so) / ip / 3));
+  const bb = Math.max(0, Math.min(1, 1 - statN(row.bb) / ip / 3));
+  return Math.max(1, Math.min(99, Math.round(100 * (0.35 * era + 0.3 * whip + 0.2 * so + 0.15 * bb))));
+}
+
+function prettyName(s) {
+  const clean = String(s || "").replace(/#\d+/g, "").trim();
+  const m = clean.match(/^([^,]+),\s*(.+)$/);
+  return m ? (m[2] + " " + m[1]).replace(/\s+/g, " ").trim() : clean;
+}
+
+function sidePlayers(html, which, kind) {
+  const id = (kind === "pit" ? "gvPitchers" : "gvBatters") + (which === "home" ? "Home" : "Visitor") + "_gvPlayers";
+  const table = String(html || "").match(new RegExp('id="maincontent_' + id + '"[\\s\\S]+?</table>', "i"));
+  if (!table) return [];
+  const keys = kind === "pit" ? PIT_KEYS : BAT_KEYS;
+  const out = [];
+  for (const tr of table[0].split(/<tr/i).slice(1)) {
+    const cells = tableCells(tr);
+    if (!/^\d+$/.test(String(cells[0] || "").trim())) continue;
+    const stats = {};
+    keys.forEach((k, i) => { stats[k] = cells[i + 2]; });
+    const rate = kind === "pit" ? pitRate(stats) : hitRate(stats);
+    const w = kind === "pit" ? innings(stats.ip) : statN(stats.ab);
+    if (rate == null || w <= 0) continue;
+    out.push({ name: prettyName(cells[1]), rate, w });
+  }
+  return out.sort((a, b) => b.rate - a.rate || a.name.localeCompare(b.name));
+}
+
+function gradeOf(rows) {
+  let total = 0;
+  let weight = 0;
+  for (const row of rows) {
+    total += row.rate * row.w;
+    weight += row.w;
+  }
+  return weight ? Math.round(total / weight) : null;
+}
+
+function rateGame(html, id, code) {
+  const rows = lineScore(html);
+  const usI = rows.findIndex((r) => teamCode(r.team, gameNames) === code);
+  const usRow = rows[usI];
+  const themRow = rows.find((r) => r !== usRow);
+  if (!usRow || !themRow) return null;
+  const which = usI === 0 ? "visitor" : "home";
+  const hitters = sidePlayers(html, which, "bat");
+  const pitchers = sidePlayers(html, which, "pit");
+  if (!hitters.length && !pitchers.length) return null;
+  const bat = gradeOf(hitters);
+  const pit = gradeOf(pitchers);
+  const when = gameWhen(html);
+  const us = usRow.r;
+  const them = themRow.r;
+  return {
+    id: String(id),
+    date: when.date,
+    time: when.time,
+    opp: themRow.team,
+    us,
+    them,
+    mark: us > them ? "W" : us < them ? "L" : "T",
+    bat,
+    pit,
+    all: bat != null && pit != null ? Math.round(0.55 * bat + 0.45 * pit) : bat != null ? bat : pit,
+    hitters: hitters.map(({ name, rate }) => ({ name, rate })),
+    pitchers: pitchers.map(({ name, rate }) => ({ name, rate })),
+  };
+}
+
+async function teamGameLog(code, seasons) {
+  const row = GAME_TEAMS[String(code || "").toUpperCase()];
+  if (!row) return [];
+  const list = (seasons && seasons.length ? seasons : ["110335"]).map(String);
+  const key = row[0] + ":" + list.join(",");
+  const hit = gameLogCache[key];
+  if (hit && Date.now() - hit.at < 15 * 60 * 1000) return hit.games;
+  const idLists = await Promise.all(list.map((season) => scheduleGameIds(season, row[1]).catch(() => [])));
+  const ids = [...new Set(idLists.flat())];
+  const pages = await Promise.all(ids.map((id) => fetchHtml(GAME_URL + id).then((html) => ({ id, html })).catch(() => null)));
+  const games = pages.map((p) => (p ? rateGame(p.html, p.id, code) : null)).filter(Boolean);
+  games.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time).localeCompare(String(a.time)));
+  gameLogCache[key] = { at: Date.now(), games };
+  return games;
+}
+
+function attachGameLog(app, requireTeam) {
+  app.get("/api/plw-games", requireTeam, async (req, res) => {
+    try {
+      const code = String(req.query.team || "").toUpperCase();
+      const seasons = String(req.query.season || "110335").split(/[,\s]+/).filter((s) => /^\d+$/.test(s)).slice(0, 6);
+      res.json({ team: code, games: await teamGameLog(code, seasons) });
+    } catch (err) {
+      res.status(502).json({ error: String(err.message || err), games: [] });
+    }
+  });
+}
+
+module.exports = { attachGameLines, parseBox, loadBoxes, foldSameDay, fieldingTotals, applyFielding, teamGameLog, attachGameLog };

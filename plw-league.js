@@ -398,7 +398,7 @@ async function getPlwTourneyBook(eventId, force) {
     applyStandings(teams, Object.values(rec));
     applyFielding(teams, await fieldingTotals(TOURNEY, TEAM_NAMES, force).catch(() => ({})));
     season = TOURNEY;
-    note = "Tally of every posted tournament, ranked by W-L. Pick an event for that day’s board.";
+    note = "Tally of every posted tournament. Pick an event for that day’s board.";
   } else if (ev && ev.season) {
     teams = await loadSeasonTeams(ev.season, force);
   }

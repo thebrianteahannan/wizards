@@ -5,6 +5,7 @@ const { attachAuth, requireTeam, requireAdmin, resolvePlayer } = require("./acco
 const { attachRecruitActions } = require("./recruit-actions");
 const { getPlwStats } = require("./plw-stats");
 const { attachPlwLeague } = require("./plw-league");
+const { attachGameLog } = require("./plw-box");
 const { attachNightSit } = require("./night-sit");
 const { syncLeagueOffers, syncScheduleEvents } = require("./plw-calendar");
 
@@ -595,6 +596,7 @@ attachRecruitActions(app, {
   positions: JOIN_POS,
 });
 attachPlwLeague(app, { requireTeam, requireAdmin, readJson, writeJson });
+attachGameLog(app, requireTeam);
 attachNightSit(app, { readJson, writeJson, requireAdmin });
 
 const FEE_MODELS = ["flat", "split", "core", "play"];
